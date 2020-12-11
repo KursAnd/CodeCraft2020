@@ -7,7 +7,7 @@ MyStrategy::MyStrategy() {}
 Action MyStrategy::getAction(const PlayerView& playerView, DebugInterface* debugInterface)
 {
     Action result = Action(std::unordered_map<int, EntityAction>());
-    strategy_0 (playerView, debugInterface, result);
+    strategy_1 (playerView, debugInterface, result);
     return result;
 }
 
