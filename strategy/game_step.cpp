@@ -62,7 +62,7 @@ Vec2Int game_step_t::get_place_for (const EntityType type) const
 
 bool game_step_t::need_build (const EntityType type) const
 {
-  if (m_resource < entity_price (type))
+  if (collect_money || m_resource < entity_price (type))
     return false;
   switch (type)
     {
@@ -70,11 +70,27 @@ bool game_step_t::need_build (const EntityType type) const
       case RANGED_UNIT : return !need_build (BUILDER_UNIT);
       case MELEE_UNIT  : return !need_build (BUILDER_UNIT);
 
-      case HOUSE       : return get_count (BUILDER_UNIT) >= MIN_BUILDER_UNITS && m_res_pos.x + m_res_pos.y >= 6;
+      case HOUSE       :
+        return    get_count (BUILDER_UNIT) >= MIN_BUILDER_UNITS
+               && m_res_pos.x + m_res_pos.y >= 6
+               && 1.0 * m_population_use / m_population_max > 0.7;
       case TURRET      : return get_count (BUILDER_UNIT) >= MIN_BUILDER_UNITS;
       default: break;
     }
   return false;
+}
+
+void game_step_t::check_have_build (const EntityType type)
+{
+  switch (type)
+    {
+      case BUILDER_BASE:
+      case RANGED_BASE :
+      case MELEE_BASE  :
+        if (get_count (type) < 1)
+          collect_money = true;
+      default: break;
+    }
 }
 
 int game_step_t::entity_price (const EntityType type, const int cnt) const
@@ -142,7 +158,7 @@ int game_step_t::get_distance (const Vec2Int &pos, const Entity *ent_b, const En
 void game_step_t::try_build (const EntityType buildType, Action& result)
 {
   if (!need_build (buildType))
-    return;
+    return check_have_build (buildType);
 
   Vec2Int pos = get_place_for (buildType);
   if (pos.x < 0)

@@ -14,9 +14,10 @@ void strategy_1 (const PlayerView& playerView, DebugInterface* debugInterface, A
   gs.check_repair (HOUSE       , result);
   gs.check_repair (WALL        , result);
 
-  gs.try_train_unit (BUILDER_BASE, result);
 
   gs.try_build (BUILDER_BASE, result);
+  gs.try_train_unit (BUILDER_BASE, result);
+
   gs.try_build (MELEE_BASE  , result);
   gs.try_build (RANGED_BASE , result);
   gs.try_build (TURRET      , result);
