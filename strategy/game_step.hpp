@@ -46,6 +46,7 @@ public:
 
 
   bool buy_entity (const EntityType type, const int cnt = 1);
-  void try_build (const EntityType buildType, Action& result);
   void make_busy (const Entity *entity);
+  void try_build    (const EntityType buildType,  Action& result);
+  void check_repair (const EntityType repairType, Action& result);
 };

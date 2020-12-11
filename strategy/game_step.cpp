@@ -169,10 +169,38 @@ void game_step_t::try_build (const EntityType buildType, Action& result)
   else
     moveAction = std::shared_ptr<MoveAction> (new MoveAction (Vec2Int (pos.x + buildProperties.size - 1, pos.y + buildProperties.size - 1), true, true));
 
-  ids_was.insert (entity->id);
+  make_busy (entity);
   buy_entity (buildType);
           
   result.entityActions[entity->id] = EntityAction (moveAction, buildAction, atackAction, repairAction);
+}
+
+void game_step_t::check_repair (const EntityType repairType, Action &result)
+{
+  for (const Entity *repair_entity : get_vector (repairType))
+    {
+      const EntityProperties &properties = playerView->entityProperties.at (repair_entity->entityType);
+
+      if (repair_entity->health >= properties.maxHealth)
+        continue;
+
+      // TO-DO: let rebuild all workers near building
+      const Entity *entity = nullptr;
+      for (const Entity *_entity : get_vector (BUILDER_UNIT))
+        if (!is_busy (_entity) && (!entity || get_distance (repair_entity, _entity) < get_distance (repair_entity, entity)))
+          entity = _entity;
+
+      if (!entity)
+        continue;
+
+      std::shared_ptr<MoveAction>   moveAction   = std::shared_ptr<MoveAction> (new MoveAction (repair_entity->position, true, true));
+      std::shared_ptr<BuildAction>  buildAction  = nullptr;
+      std::shared_ptr<AttackAction> atackAction  = nullptr;
+      std::shared_ptr<RepairAction> repairAction = std::shared_ptr<RepairAction> (new RepairAction (repair_entity->id));
+
+      make_busy (entity);
+      result.entityActions[entity->id] = EntityAction (moveAction, buildAction, atackAction, repairAction);
+    }
 }
 
 void game_step_t::make_busy (const Entity *entity)

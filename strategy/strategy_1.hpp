@@ -6,42 +6,13 @@ void strategy_1 (const PlayerView& playerView, DebugInterface* debugInterface, A
 {
   game_step_t gs (playerView, debugInterface, result);
 
-  for (int i = 0; i < 10; ++i)
-    {
-      std::cout << i << "\t";
-      for (const Entity *entity : gs.get_vector (static_cast<EntityType> (i)))
-        std::cout << entity->id << "(" << entity->health << ") ";
-      std::cout << "\n";
-    }
-  std::cout << "\n\n";
 
-  for (const Entity *house_entity : gs.get_vector (HOUSE))
-    {
-      const EntityProperties &properties = playerView.entityProperties.at (house_entity->entityType);
-
-      if (house_entity->health < properties.maxHealth)
-        {
-          // TO-DO: let rebuild all workers near building
-          const Entity *entity = nullptr;
-          for (const Entity *_entity : gs.get_vector (BUILDER_UNIT))
-            if (!gs.is_busy (_entity) && (!entity || gs.get_distance (house_entity, _entity) < gs.get_distance (house_entity, entity)))
-              entity = _entity;
-
-          if (entity)
-            {
-              const EntityProperties &properties = playerView.entityProperties.at (entity->entityType);
-              EntityType buildEntityType = properties.build->options[0];
-
-              std::shared_ptr<MoveAction>   moveAction   = std::shared_ptr<MoveAction> (new MoveAction (house_entity->position, true, true));
-              std::shared_ptr<BuildAction>  buildAction  = nullptr;
-              std::shared_ptr<AttackAction> atackAction  = nullptr;
-              std::shared_ptr<RepairAction> repairAction = std::shared_ptr<RepairAction> (new RepairAction (house_entity->id));
-
-              result.entityActions[entity->id] = EntityAction (moveAction, buildAction, atackAction, repairAction);
-              gs.make_busy (entity);
-            }
-        }
-    }
+  gs.check_repair (BUILDER_BASE, result);
+  gs.check_repair (MELEE_BASE  , result);
+  gs.check_repair (RANGED_BASE , result);
+  gs.check_repair (TURRET      , result);
+  gs.check_repair (HOUSE       , result);
+  gs.check_repair (WALL        , result);
 
   gs.try_build (HOUSE , result);
   gs.try_build (TURRET, result);
