@@ -122,6 +122,11 @@ bool game_step_t::buy_entity (const EntityType type, const int cnt)
   return true;
 }
 
+void game_step_t::make_busy (const Entity *entity)
+{
+  ids_was.insert (entity->id);
+}
+
 Vec2Int game_step_t::get_res_pos () const
 {
   return m_res_pos;
@@ -257,7 +262,60 @@ void game_step_t::check_repair (const EntityType repairType, Action &result)
     }
 }
 
-void game_step_t::make_busy (const Entity *entity)
+void game_step_t::move_builders (Action &result)
 {
-  ids_was.insert (entity->id);
+  const EntityType type = BUILDER_UNIT;
+  const EntityProperties &properties = playerView->entityProperties.at (type);
+  
+  for (const Entity *entity : get_vector (type))
+    {
+      if (is_busy (entity))
+        continue;
+
+      std::shared_ptr<MoveAction>   moveAction   = std::shared_ptr<MoveAction> (new MoveAction (get_res_pos (), true, true));
+      std::shared_ptr<BuildAction>  buildAction  = nullptr;
+      std::shared_ptr<AttackAction> atackAction  = std::shared_ptr<AttackAction> (new AttackAction (nullptr, std::shared_ptr<AutoAttack> (new AutoAttack (properties.sightRange, {RESOURCE}))));
+      std::shared_ptr<RepairAction> repairAction = nullptr;
+
+      result.entityActions[entity->id] = EntityAction (moveAction, buildAction, atackAction, repairAction);
+    }
+}
+
+void game_step_t::move_army (const EntityType type, Action& result)
+{
+  const EntityProperties &properties = playerView->entityProperties.at (type);
+
+  for (const Entity *entity : get_vector (type))
+    {
+      if (is_busy (entity))
+        continue;
+
+      std::shared_ptr<MoveAction>   moveAction   = nullptr;
+      std::shared_ptr<BuildAction>  buildAction  = nullptr;
+      std::shared_ptr<AttackAction> atackAction  = std::shared_ptr<AttackAction> (new AttackAction (nullptr, std::shared_ptr<AutoAttack> (new AutoAttack (properties.sightRange, {}))));;
+      std::shared_ptr<RepairAction> repairAction = nullptr;
+
+      if (get_army_count () > 20)
+        moveAction = std::shared_ptr<MoveAction> (new MoveAction (Vec2Int (playerView->mapSize - 1, playerView->mapSize - 1), true, true));
+      else
+        moveAction = std::shared_ptr<MoveAction> (new MoveAction (Vec2Int (10 + rand () % 11, 10 + rand () % 11), true, false));
+
+      result.entityActions[entity->id] = EntityAction (moveAction, buildAction, atackAction, repairAction);
+    }
+}
+
+void game_step_t::turn_on_turrets (Action &result)
+{
+  const EntityType type = TURRET;
+  const EntityProperties &properties = playerView->entityProperties.at (type);
+  
+  for (const Entity *entity : get_vector (type))
+    {
+      std::shared_ptr<MoveAction>   moveAction   = nullptr;
+      std::shared_ptr<BuildAction>  buildAction  = nullptr;
+      std::shared_ptr<AttackAction> atackAction  = std::shared_ptr<AttackAction> (new AttackAction (nullptr, std::shared_ptr<AutoAttack> (new AutoAttack (properties.sightRange, {}))));
+      std::shared_ptr<RepairAction> repairAction = nullptr;
+
+      result.entityActions[entity->id] = EntityAction (moveAction, buildAction, atackAction, repairAction);
+    }
 }

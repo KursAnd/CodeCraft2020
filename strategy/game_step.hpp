@@ -50,7 +50,10 @@ public:
 
   bool buy_entity (const EntityType type, const int cnt = 1);
   void make_busy (const Entity *entity);
-  void try_build      (const EntityType buildType  , Action& result);
+  void try_build      (const EntityType buildType, Action& result);
   void train_unit (const EntityType factoryType, Action& result);
-  void check_repair   (const EntityType repairType , Action& result);
-};
+  void check_repair   (const EntityType repairType, Action& result);
+  void move_builders (Action& result);
+  void move_army (const EntityType type, Action& result);
+  void turn_on_turrets (Action& result);
+  };  

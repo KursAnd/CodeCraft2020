@@ -26,64 +26,10 @@ void strategy_1 (const PlayerView& playerView, DebugInterface* debugInterface, A
   gs.try_build (WALL        , result);
 
 
-  for (const Entity *entity : gs.get_vector (BUILDER_UNIT))
-    {
-      if (gs.is_busy (entity))
-        continue;
 
-      const EntityProperties &properties = playerView.entityProperties.at (entity->entityType);
+  gs.move_builders (result);
+  gs.move_army (RANGED_UNIT, result);
+  gs.move_army (MELEE_UNIT , result);
 
-      std::shared_ptr<MoveAction>   moveAction   = std::shared_ptr<MoveAction> (new MoveAction (gs.get_res_pos (), true, true));
-      std::shared_ptr<BuildAction>  buildAction  = nullptr;
-      std::shared_ptr<AttackAction> atackAction  = std::shared_ptr<AttackAction> (new AttackAction (nullptr, std::shared_ptr<AutoAttack> (new AutoAttack (properties.sightRange, {RESOURCE}))));
-      std::shared_ptr<RepairAction> repairAction = nullptr;
-
-      result.entityActions[entity->id] = EntityAction (moveAction, buildAction, atackAction, repairAction);
-    }
-
-  for (const Entity *entity : gs.get_vector (RANGED_UNIT))
-    {
-      const EntityProperties &properties = playerView.entityProperties.at (entity->entityType);
-
-      std::shared_ptr<MoveAction>   moveAction   = nullptr;
-      std::shared_ptr<BuildAction>  buildAction  = nullptr;
-      std::shared_ptr<AttackAction> atackAction  = std::shared_ptr<AttackAction> (new AttackAction (nullptr, std::shared_ptr<AutoAttack> (new AutoAttack (properties.sightRange, {}))));;
-      std::shared_ptr<RepairAction> repairAction = nullptr;
-
-      if (gs.get_army_count () > 20)
-        moveAction = std::shared_ptr<MoveAction> (new MoveAction (Vec2Int (playerView.mapSize - 1, playerView.mapSize - 1), true, true));
-      else
-        moveAction = std::shared_ptr<MoveAction> (new MoveAction (Vec2Int (22, 22), true, false));
-
-      result.entityActions[entity->id] = EntityAction (moveAction, buildAction, atackAction, repairAction);
-    }
-
-  for (const Entity *entity : gs.get_vector (MELEE_UNIT))
-    {
-      const EntityProperties &properties = playerView.entityProperties.at (entity->entityType);
-
-      std::shared_ptr<MoveAction>   moveAction   = nullptr;
-      std::shared_ptr<BuildAction>  buildAction  = nullptr;
-      std::shared_ptr<AttackAction> atackAction  = std::shared_ptr<AttackAction> (new AttackAction (nullptr, std::shared_ptr<AutoAttack> (new AutoAttack (properties.sightRange, {}))));;
-      std::shared_ptr<RepairAction> repairAction = nullptr;
-
-      if (gs.get_army_count () > 20)
-        moveAction = std::shared_ptr<MoveAction> (new MoveAction (Vec2Int (playerView.mapSize - 1, playerView.mapSize - 1), true, true));
-      else
-        moveAction = std::shared_ptr<MoveAction> (new MoveAction (Vec2Int (22, 22), true, false));
-
-      result.entityActions[entity->id] = EntityAction (moveAction, buildAction, atackAction, repairAction);
-    }
-
-  for (const Entity *entity : gs.get_vector (TURRET))
-    {
-      const EntityProperties &properties = playerView.entityProperties.at (entity->entityType);
-
-      std::shared_ptr<MoveAction>   moveAction   = nullptr;
-      std::shared_ptr<BuildAction>  buildAction  = nullptr;
-      std::shared_ptr<AttackAction> atackAction  = std::shared_ptr<AttackAction> (new AttackAction (nullptr, std::shared_ptr<AutoAttack> (new AutoAttack (properties.sightRange, {}))));
-      std::shared_ptr<RepairAction> repairAction = nullptr;
-
-      result.entityActions[entity->id] = EntityAction (moveAction, buildAction, atackAction, repairAction);
-    }
+  gs.turn_on_turrets (result);
 }
