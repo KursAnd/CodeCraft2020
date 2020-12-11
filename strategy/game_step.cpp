@@ -179,6 +179,31 @@ void game_step_t::try_build (const EntityType buildType, Action& result)
   result.entityActions[entity->id] = EntityAction (moveAction, buildAction, atackAction, repairAction);
 }
 
+void game_step_t::try_train_unit (const EntityType factoryType, Action &result)
+{
+  for (const Entity *entity : get_vector (factoryType))
+    {
+      const EntityProperties &properties = playerView->entityProperties.at (entity->entityType);
+      EntityType buildType = properties.build->options[0];
+
+      if (!need_build (buildType))
+        continue;
+
+      std::shared_ptr<MoveAction>   moveAction   = nullptr;
+      std::shared_ptr<BuildAction>  buildAction  = nullptr;
+      std::shared_ptr<AttackAction> atackAction  = nullptr;
+      std::shared_ptr<RepairAction> repairAction = nullptr;
+
+      //TO-DO: build in different places + check emptiness
+      buildAction = std::shared_ptr<BuildAction> (new BuildAction (buildType, Vec2Int (entity->position.x + properties.size, entity->position.y + properties.size - 1)));
+
+      make_busy (entity);
+      buy_entity (buildType);
+
+      result.entityActions[entity->id] = EntityAction (moveAction, buildAction, atackAction, repairAction);
+    }
+}
+
 void game_step_t::check_repair (const EntityType repairType, Action &result)
 {
   for (const Entity *repair_entity : get_vector (repairType))

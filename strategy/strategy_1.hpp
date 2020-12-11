@@ -14,12 +14,17 @@ void strategy_1 (const PlayerView& playerView, DebugInterface* debugInterface, A
   gs.check_repair (HOUSE       , result);
   gs.check_repair (WALL        , result);
 
+  gs.try_train_unit (BUILDER_BASE, result);
+
   gs.try_build (BUILDER_BASE, result);
   gs.try_build (MELEE_BASE  , result);
   gs.try_build (RANGED_BASE , result);
   gs.try_build (TURRET      , result);
   gs.try_build (HOUSE       , result);
   gs.try_build (WALL        , result);
+
+  gs.try_train_unit (RANGED_BASE , result);
+  gs.try_train_unit (MELEE_BASE  , result);
 
   for (const Entity *entity : gs.get_vector (BUILDER_UNIT))
     {
@@ -32,64 +37,6 @@ void strategy_1 (const PlayerView& playerView, DebugInterface* debugInterface, A
       std::shared_ptr<BuildAction>  buildAction  = nullptr;
       std::shared_ptr<AttackAction> atackAction  = std::shared_ptr<AttackAction> (new AttackAction (nullptr, std::shared_ptr<AutoAttack> (new AutoAttack (properties.sightRange, {RESOURCE}))));
       std::shared_ptr<RepairAction> repairAction = nullptr;
-
-      result.entityActions[entity->id] = EntityAction (moveAction, buildAction, atackAction, repairAction);
-    }
-
-
-  for (const Entity *entity : gs.get_vector (BUILDER_BASE))
-    {
-      const EntityProperties &properties = playerView.entityProperties.at (entity->entityType);
-      EntityType buildEntityType = properties.build->options[0];
-
-      std::shared_ptr<MoveAction>   moveAction   = nullptr;
-      std::shared_ptr<BuildAction>  buildAction  = nullptr;
-      std::shared_ptr<AttackAction> atackAction  = nullptr;
-      std::shared_ptr<RepairAction> repairAction = nullptr;
-
-      if (gs.need_build (buildEntityType))
-        {
-          buildAction = std::shared_ptr<BuildAction> (new BuildAction (buildEntityType, Vec2Int (entity->position.x + properties.size, entity->position.y + properties.size - 1)));
-          gs.buy_entity (buildEntityType);
-        }
-
-      result.entityActions[entity->id] = EntityAction (moveAction, buildAction, atackAction, repairAction);
-    }
-
-  for (const Entity *entity : gs.get_vector (RANGED_BASE))
-    {
-      const EntityProperties &properties = playerView.entityProperties.at (entity->entityType);
-      EntityType buildEntityType = properties.build->options[0];
-
-      std::shared_ptr<MoveAction>   moveAction = nullptr;
-      std::shared_ptr<BuildAction>  buildAction = nullptr;
-      std::shared_ptr<AttackAction> atackAction = nullptr;
-      std::shared_ptr<RepairAction> repairAction = nullptr;
-
-      if (gs.need_build (buildEntityType))
-        {
-          buildAction = std::shared_ptr<BuildAction> (new BuildAction (buildEntityType, Vec2Int (entity->position.x + properties.size, entity->position.y + properties.size - 1)));
-          gs.buy_entity (buildEntityType);
-        }
-
-      result.entityActions[entity->id] = EntityAction (moveAction, buildAction, atackAction, repairAction);
-    }
-
-  for (const Entity *entity : gs.get_vector (MELEE_BASE))
-    {
-      const EntityProperties &properties = playerView.entityProperties.at (entity->entityType);
-      EntityType buildEntityType = properties.build->options[0];
-
-      std::shared_ptr<MoveAction>   moveAction = nullptr;
-      std::shared_ptr<BuildAction>  buildAction = nullptr;
-      std::shared_ptr<AttackAction> atackAction = nullptr;
-      std::shared_ptr<RepairAction> repairAction = nullptr;
-
-      if (gs.need_build (buildEntityType))
-        {
-          buildAction = std::shared_ptr<BuildAction> (new BuildAction (buildEntityType, Vec2Int (entity->position.x + properties.size, entity->position.y + properties.size - 1)));
-          gs.buy_entity (buildEntityType);
-        }
 
       result.entityActions[entity->id] = EntityAction (moveAction, buildAction, atackAction, repairAction);
     }
