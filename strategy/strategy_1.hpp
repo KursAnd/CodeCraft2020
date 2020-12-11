@@ -14,8 +14,12 @@ void strategy_1 (const PlayerView& playerView, DebugInterface* debugInterface, A
   gs.check_repair (HOUSE       , result);
   gs.check_repair (WALL        , result);
 
-  gs.try_build (HOUSE , result);
-  gs.try_build (TURRET, result);
+  gs.try_build (BUILDER_BASE, result);
+  gs.try_build (MELEE_BASE  , result);
+  gs.try_build (RANGED_BASE , result);
+  gs.try_build (TURRET      , result);
+  gs.try_build (HOUSE       , result);
+  gs.try_build (WALL        , result);
 
   for (const Entity *entity : gs.get_vector (BUILDER_UNIT))
     {

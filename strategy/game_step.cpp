@@ -5,6 +5,10 @@ std::unordered_map<EntityType, std::vector<Vec2Int>> game_step_t::init_places_fo
   std::unordered_map<EntityType, std::vector<Vec2Int>> res;
   res[HOUSE]  = { {0, 0}, {3, 0}, {0, 3}, {6, 0}, {0, 6}, {9, 0}, {0, 9}, {12, 0}, {0, 12}, {15, 0}, {0, 15} };
   res[TURRET] = { {15, 15}, {20, 6}, {6, 20} };
+  res[BUILDER_BASE] = { {5, 5} };
+  res[MELEE_BASE] = { {5, 15} };
+  res[RANGED_BASE] = { {15, 5} };
+  res[WALL] = {};
   return res;
 }
 
