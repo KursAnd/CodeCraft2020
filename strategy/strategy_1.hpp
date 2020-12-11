@@ -14,8 +14,6 @@ void strategy_1 (const PlayerView& playerView, DebugInterface* debugInterface, A
       std::cout << "\n";
     }
   std::cout << "\n\n";
-  
-  std::unordered_set<int> was;
 
   for (const Entity *house_entity : gs.get_vector (HOUSE))
     {
@@ -26,9 +24,7 @@ void strategy_1 (const PlayerView& playerView, DebugInterface* debugInterface, A
           // TO-DO: let rebuild all workers near building
           const Entity *entity = nullptr;
           for (const Entity *_entity : gs.get_vector (BUILDER_UNIT))
-            if (!was.count (_entity->id) &&
-                (!entity || (house_entity->position.x - _entity->position.x)*(house_entity->position.x - _entity->position.x) + (house_entity->position.y - _entity->position.y)*(house_entity->position.y - _entity->position.y)
-                          < (house_entity->position.x - entity->position.x)*(house_entity->position.x - entity->position.x) + (house_entity->position.y - entity->position.y)*(house_entity->position.y - entity->position.y)))
+            if (!gs.is_busy (_entity) && (!entity || gs.get_distance (house_entity, _entity) < gs.get_distance (house_entity, entity)))
               entity = _entity;
 
           if (entity)
@@ -42,52 +38,17 @@ void strategy_1 (const PlayerView& playerView, DebugInterface* debugInterface, A
               std::shared_ptr<RepairAction> repairAction = std::shared_ptr<RepairAction> (new RepairAction (house_entity->id));
 
               result.entityActions[entity->id] = EntityAction (moveAction, buildAction, atackAction, repairAction);
-              was.insert (entity->id);
+              gs.make_busy (entity);
             }
         }
     }
 
-  if (gs.need_build (HOUSE))
-    {
-     const Entity *entity = nullptr;
-      for (const Entity *_entity : gs.get_vector (BUILDER_UNIT))
-        if (!was.count (_entity->id) &&
-            (!entity || entity->position.x + entity->position.y > _entity->position.x + _entity->position.y))
-          entity = _entity;
-
-      if (entity)
-        {
-          const EntityProperties &properties = playerView.entityProperties.at (entity->entityType);
-          const EntityType buildEntityType = properties.build->options[0];
-          const EntityProperties &buildProperties = playerView.entityProperties.at (buildEntityType);
-
-          Vec2Int pos = gs.get_place_for (HOUSE);
-          if (pos.x >= 0)
-            {
-              std::shared_ptr<MoveAction>   moveAction   = nullptr;
-              std::shared_ptr<BuildAction>  buildAction  = nullptr;
-              std::shared_ptr<AttackAction> atackAction  = nullptr;
-              std::shared_ptr<RepairAction> repairAction = nullptr;
-
-              if (   entity->position.x == pos.x + buildProperties.size - 1 && entity->position.y == pos.y + buildProperties.size
-                  || entity->position.y == pos.y + buildProperties.size - 1 && entity->position.x == pos.x + buildProperties.size)
-                buildAction = std::shared_ptr<BuildAction> (new BuildAction (buildEntityType, pos));
-              else if (pos.x + buildProperties.size - 1 == entity->position.x && pos.y + buildProperties.size - 1 == entity->position.y)
-                moveAction = std::shared_ptr<MoveAction> (new MoveAction (Vec2Int (pos.x + buildProperties.size, pos.y + buildProperties.size - 1), true, true));
-              else
-                moveAction = std::shared_ptr<MoveAction> (new MoveAction (Vec2Int (pos.x + buildProperties.size - 1, pos.y + buildProperties.size - 1), true, true));
-
-              result.entityActions[entity->id] = EntityAction (moveAction, buildAction, atackAction, repairAction);
-              was.insert (entity->id);
-              gs.buy_entity (buildEntityType);
-            }
-        }
-    }
-
+  gs.try_build (HOUSE , result);
+  gs.try_build (TURRET, result);
 
   for (const Entity *entity : gs.get_vector (BUILDER_UNIT))
     {
-      if (was.count (entity->id))
+      if (gs.is_busy (entity))
         continue;
 
       const EntityProperties &properties = playerView.entityProperties.at (entity->entityType);
