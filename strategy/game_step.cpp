@@ -1,5 +1,13 @@
 #include "game_step.hpp"
 
+std::unordered_map<EntityType, std::vector<Vec2Int>> game_step_t::init_places_for_building ()
+{
+  std::unordered_map<EntityType, std::vector<Vec2Int>> res;
+  res[HOUSE]  = { {0, 0}, {3, 0}, {0, 3}, {6, 0}, {0, 6}, {9, 0}, {0, 9}, {12, 0}, {0, 12}, {15, 0}, {0, 15} };
+  res[TURRET] = {};
+  return res;
+}
+
 game_step_t::game_step_t (const PlayerView &_playerView, DebugInterface *_debugInterface, Action &_result)
   : playerView (&_playerView), debugInterface (_debugInterface), result (&_result),
     m_res_pos (_playerView.mapSize - 1, _playerView.mapSize - 1)
@@ -31,39 +39,79 @@ game_step_t::game_step_t (const PlayerView &_playerView, DebugInterface *_debugI
     m_res_pos = Vec2Int (0, 0);
 }
 
-Vec2Int game_step_t::get_place_for_HOUSE () const
+Vec2Int game_step_t::get_place_for (const EntityType type) const
 {
-  static std::vector<Vec2Int> priority = { {0, 0}, {3, 0}, {0, 3}, {6, 0}, {0, 6}, {9, 0}, {0, 9}, {12, 0}, {0, 12}, {15, 0}, {0, 15} };
-  std::unordered_set<int> exclude;
-  for (const Entity *entity : m_entity.at (HOUSE))
-    exclude.insert (entity->position.x * playerView->mapSize + entity->position.y);
+  static std::unordered_map <EntityType, std::vector<Vec2Int>> priority = init_places_for_building ();
 
-  for (const Vec2Int &vec2 : priority)
-    if (!exclude.count (vec2.x * playerView->mapSize + vec2.y))
-      return vec2;
+  if (priority[type].size () > get_count (type))
+    {
+      std::unordered_set<int> exclude;
+      for (const Entity *entity : get_vector (type))
+        exclude.insert (entity->position.x * playerView->mapSize + entity->position.y);
+
+      for (const Vec2Int &vec2 : priority[type])
+        if (!exclude.count (vec2.x * playerView->mapSize + vec2.y))
+          return vec2;
+    }
   return Vec2Int (-1, -1);
 }
 
-bool game_step_t::need_build (EntityType type) const
+bool game_step_t::need_build (const EntityType type) const
 {
+  if (m_resource < entity_price (type))
+    return false;
   switch (type)
     {
-      case BUILDER_UNIT: return m_entity.at (BUILDER_UNIT).size () < std::max (6, m_population_max * 3 / 10);
+      case BUILDER_UNIT: return get_count (BUILDER_UNIT) < std::max (MIN_BUILDER_UNITS, m_population_max * 3 / 10);
       case RANGED_UNIT : return !need_build (BUILDER_UNIT);
-      case MELEE_BASE  : return !need_build (BUILDER_UNIT);
+      case MELEE_UNIT  : return !need_build (BUILDER_UNIT);
+
+      case HOUSE       : return get_count (BUILDER_UNIT) >= MIN_BUILDER_UNITS && m_res_pos.x + m_res_pos.y >= 6;
       default: break;
     }
   return false;
 }
 
-std::unordered_map<int, const Entity *> task_groups_t::m_builder;
-
-void task_groups_t::update (const game_step_t &game_step)
+int game_step_t::entity_price (const EntityType type, const int cnt) const
 {
-  std::unordered_map<int, const Entity *> ids = task_groups_t::m_builder;
-  for (const std::pair<int, const Entity *> &el : ids)
+  const EntityProperties &properties = playerView->entityProperties.at (type);
+  int price = properties.initialCost * cnt;
+  switch (type)
     {
-      if (!game_step.m_entity_set.at (BUILDER_UNIT).count (el.second->id))
-        task_groups_t::m_builder.erase (el.second->id);
+      case BUILDER_UNIT:
+      case RANGED_UNIT :
+      case MELEE_BASE  :
+        price += get_count (type) * cnt + cnt * (cnt - 1) / 2;
+        break;
+      default : break;
     }
+  return price;
+}
+
+bool game_step_t::buy_entity (const EntityType type, const int cnt)
+{
+  int price = entity_price (type, cnt);
+  if (m_resource < price)
+    return false;
+  m_resource -= price;
+  return true;
+}
+
+Vec2Int game_step_t::get_res_pos () const
+{
+  return m_res_pos;
+}
+
+int game_step_t::get_count (const EntityType type) const
+{
+  if (!m_entity.count (type))
+    return 0;
+  return m_entity.at (type).size ();
+}
+
+const std::vector<const Entity *> &game_step_t::get_vector (const EntityType type) const
+{
+  if (!m_entity.count (type))
+    return std::vector<const Entity *> ();
+  return m_entity.at (type);
 }

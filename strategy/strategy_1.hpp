@@ -1,17 +1,15 @@
 #pragma once
 #include "game_step.hpp"
-#include "iostream"
+#include <iostream>
 
 void strategy_1 (const PlayerView& playerView, DebugInterface* debugInterface, Action& result)
 {
   game_step_t gs (playerView, debugInterface, result);
-  task_groups_t::update (gs);
 
   for (int i = 0; i < 10; ++i)
     {
       std::cout << i << "\t";
-      EntityType et = static_cast<EntityType> (i);
-      for (const Entity *entity : gs.m_entity[et])
+      for (const Entity *entity : gs.get_vector (static_cast<EntityType> (i)))
         std::cout << entity->id << "(" << entity->health << ") ";
       std::cout << "\n";
     }
@@ -19,7 +17,7 @@ void strategy_1 (const PlayerView& playerView, DebugInterface* debugInterface, A
   
   std::unordered_set<int> was;
 
-  for (const Entity *house_entity : gs.m_entity[HOUSE])
+  for (const Entity *house_entity : gs.get_vector (HOUSE))
     {
       const EntityProperties &properties = playerView.entityProperties.at (house_entity->entityType);
 
@@ -27,7 +25,7 @@ void strategy_1 (const PlayerView& playerView, DebugInterface* debugInterface, A
         {
           // TO-DO: let rebuild all workers near building
           const Entity *entity = nullptr;
-          for (const Entity *_entity : gs.m_entity[BUILDER_UNIT])
+          for (const Entity *_entity : gs.get_vector (BUILDER_UNIT))
             if (!was.count (_entity->id) &&
                 (!entity || (house_entity->position.x - _entity->position.x)*(house_entity->position.x - _entity->position.x) + (house_entity->position.y - _entity->position.y)*(house_entity->position.y - _entity->position.y)
                           < (house_entity->position.x - entity->position.x)*(house_entity->position.x - entity->position.x) + (house_entity->position.y - entity->position.y)*(house_entity->position.y - entity->position.y)))
@@ -49,10 +47,10 @@ void strategy_1 (const PlayerView& playerView, DebugInterface* debugInterface, A
         }
     }
 
-  if (gs.m_resource > playerView.entityProperties.at (HOUSE).initialCost && gs.m_entity[BUILDER_UNIT].size () > 5 && gs.m_res_pos.x + gs.m_res_pos.y >= 6)
+  if (gs.need_build (HOUSE))
     {
      const Entity *entity = nullptr;
-      for (const Entity *_entity : gs.m_entity[BUILDER_UNIT])
+      for (const Entity *_entity : gs.get_vector (BUILDER_UNIT))
         if (!was.count (_entity->id) &&
             (!entity || entity->position.x + entity->position.y > _entity->position.x + _entity->position.y))
           entity = _entity;
@@ -63,7 +61,7 @@ void strategy_1 (const PlayerView& playerView, DebugInterface* debugInterface, A
           const EntityType buildEntityType = properties.build->options[0];
           const EntityProperties &buildProperties = playerView.entityProperties.at (buildEntityType);
 
-          Vec2Int pos = gs.get_place_for_HOUSE ();
+          Vec2Int pos = gs.get_place_for (HOUSE);
           if (pos.x >= 0)
             {
               std::shared_ptr<MoveAction>   moveAction   = nullptr;
@@ -81,19 +79,20 @@ void strategy_1 (const PlayerView& playerView, DebugInterface* debugInterface, A
 
               result.entityActions[entity->id] = EntityAction (moveAction, buildAction, atackAction, repairAction);
               was.insert (entity->id);
+              gs.buy_entity (buildEntityType);
             }
         }
     }
 
 
-  for (const Entity *entity : gs.m_entity[BUILDER_UNIT])
+  for (const Entity *entity : gs.get_vector (BUILDER_UNIT))
     {
       if (was.count (entity->id))
         continue;
 
       const EntityProperties &properties = playerView.entityProperties.at (entity->entityType);
 
-      std::shared_ptr<MoveAction>   moveAction   = std::shared_ptr<MoveAction> (new MoveAction (gs.m_res_pos, true, true));
+      std::shared_ptr<MoveAction>   moveAction   = std::shared_ptr<MoveAction> (new MoveAction (gs.get_res_pos (), true, true));
       std::shared_ptr<BuildAction>  buildAction  = nullptr;
       std::shared_ptr<AttackAction> atackAction  = std::shared_ptr<AttackAction> (new AttackAction (nullptr, std::shared_ptr<AutoAttack> (new AutoAttack (properties.sightRange, {RESOURCE}))));
       std::shared_ptr<RepairAction> repairAction = nullptr;
@@ -102,7 +101,7 @@ void strategy_1 (const PlayerView& playerView, DebugInterface* debugInterface, A
     }
 
 
-  for (const Entity *entity : gs.m_entity[BUILDER_BASE])
+  for (const Entity *entity : gs.get_vector (BUILDER_BASE))
     {
       const EntityProperties &properties = playerView.entityProperties.at (entity->entityType);
       EntityType buildEntityType = properties.build->options[0];
@@ -110,15 +109,18 @@ void strategy_1 (const PlayerView& playerView, DebugInterface* debugInterface, A
       std::shared_ptr<MoveAction>   moveAction   = nullptr;
       std::shared_ptr<BuildAction>  buildAction  = nullptr;
       std::shared_ptr<AttackAction> atackAction  = nullptr;
-      std::shared_ptr<RepairAction> repairAction = nullptr;     
+      std::shared_ptr<RepairAction> repairAction = nullptr;
 
-      if (gs.need_build (BUILDER_UNIT))
-        buildAction = std::shared_ptr<BuildAction> (new BuildAction (buildEntityType, Vec2Int (entity->position.x + properties.size, entity->position.y + properties.size - 1)));
+      if (gs.need_build (buildEntityType))
+        {
+          buildAction = std::shared_ptr<BuildAction> (new BuildAction (buildEntityType, Vec2Int (entity->position.x + properties.size, entity->position.y + properties.size - 1)));
+          gs.buy_entity (buildEntityType);
+        }
 
       result.entityActions[entity->id] = EntityAction (moveAction, buildAction, atackAction, repairAction);
     }
 
-  for (const Entity *entity : gs.m_entity[RANGED_BASE])
+  for (const Entity *entity : gs.get_vector (RANGED_BASE))
     {
       const EntityProperties &properties = playerView.entityProperties.at (entity->entityType);
       EntityType buildEntityType = properties.build->options[0];
@@ -128,13 +130,16 @@ void strategy_1 (const PlayerView& playerView, DebugInterface* debugInterface, A
       std::shared_ptr<AttackAction> atackAction = nullptr;
       std::shared_ptr<RepairAction> repairAction = nullptr;
 
-      if (gs.need_build (RANGED_UNIT))
-        buildAction = std::shared_ptr<BuildAction> (new BuildAction (buildEntityType, Vec2Int (entity->position.x + properties.size, entity->position.y + properties.size - 1)));
+      if (gs.need_build (buildEntityType))
+        {
+          buildAction = std::shared_ptr<BuildAction> (new BuildAction (buildEntityType, Vec2Int (entity->position.x + properties.size, entity->position.y + properties.size - 1)));
+          gs.buy_entity (buildEntityType);
+        }
 
       result.entityActions[entity->id] = EntityAction (moveAction, buildAction, atackAction, repairAction);
     }
 
-  for (const Entity *entity : gs.m_entity[MELEE_BASE])
+  for (const Entity *entity : gs.get_vector (MELEE_BASE))
     {
       const EntityProperties &properties = playerView.entityProperties.at (entity->entityType);
       EntityType buildEntityType = properties.build->options[0];
@@ -144,13 +149,16 @@ void strategy_1 (const PlayerView& playerView, DebugInterface* debugInterface, A
       std::shared_ptr<AttackAction> atackAction = nullptr;
       std::shared_ptr<RepairAction> repairAction = nullptr;
 
-      if (gs.need_build (MELEE_BASE))
-        buildAction = std::shared_ptr<BuildAction> (new BuildAction (buildEntityType, Vec2Int (entity->position.x + properties.size, entity->position.y + properties.size - 1)));
+      if (gs.need_build (buildEntityType))
+        {
+          buildAction = std::shared_ptr<BuildAction> (new BuildAction (buildEntityType, Vec2Int (entity->position.x + properties.size, entity->position.y + properties.size - 1)));
+          gs.buy_entity (buildEntityType);
+        }
 
       result.entityActions[entity->id] = EntityAction (moveAction, buildAction, atackAction, repairAction);
     }
 
-  for (const Entity *entity : gs.m_entity[RANGED_UNIT])
+  for (const Entity *entity : gs.get_vector (RANGED_UNIT))
     {
       const EntityProperties &properties = playerView.entityProperties.at (entity->entityType);
 
@@ -162,14 +170,14 @@ void strategy_1 (const PlayerView& playerView, DebugInterface* debugInterface, A
       //if (gs.m_entity[RANGED_UNIT].size () + gs.m_entity[MELEE_UNIT].size () >= 7)
         //moveAction = std::shared_ptr<MoveAction> (new MoveAction (Vec2Int (playerView.mapSize - 1, playerView.mapSize - 1), true, true));
       //else
-        moveAction = std::shared_ptr<MoveAction> (new MoveAction (Vec2Int (10 + gs.m_entity[RANGED_UNIT].size (), 10 + gs.m_entity[RANGED_UNIT].size ()), true, false));
+        moveAction = std::shared_ptr<MoveAction> (new MoveAction (Vec2Int (10 + gs.get_count (RANGED_UNIT) * 2, 10 + gs.get_count (RANGED_UNIT) * 2), true, false));
 
       atackAction = std::shared_ptr<AttackAction> (new AttackAction (nullptr, std::shared_ptr<AutoAttack> (new AutoAttack (properties.sightRange, {}))));
 
       result.entityActions[entity->id] = EntityAction (moveAction, buildAction, atackAction, repairAction);
     }
 
-  for (const Entity *entity : gs.m_entity[MELEE_UNIT])
+  for (const Entity *entity : gs.get_vector (MELEE_UNIT))
     {
       const EntityProperties &properties = playerView.entityProperties.at (entity->entityType);
 
@@ -181,7 +189,7 @@ void strategy_1 (const PlayerView& playerView, DebugInterface* debugInterface, A
       //if (gs.m_entity[RANGED_UNIT].size () + gs.m_entity[MELEE_UNIT].size () >= 7)
         //moveAction = std::shared_ptr<MoveAction> (new MoveAction (Vec2Int (playerView.mapSize - 1, playerView.mapSize - 1), true, true));
       //else
-        moveAction = std::shared_ptr<MoveAction> (new MoveAction (Vec2Int (10 + gs.m_entity[MELEE_UNIT].size (), 10 + gs.m_entity[MELEE_UNIT].size ()), true, false));
+        moveAction = std::shared_ptr<MoveAction> (new MoveAction (Vec2Int (10 + gs.get_count (MELEE_UNIT) * 2, 10 + gs.get_count (MELEE_UNIT) * 2), true, false));
 
       atackAction = std::shared_ptr<AttackAction> (new AttackAction (nullptr, std::shared_ptr<AutoAttack> (new AutoAttack (properties.sightRange, {}))));
 

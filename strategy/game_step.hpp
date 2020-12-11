@@ -12,7 +12,11 @@ private:
   DebugInterface *debugInterface;
   Action *result;
 
-public:
+  static std::unordered_map<EntityType, std::vector<Vec2Int>> init_places_for_building ();
+
+
+  const int MIN_BUILDER_UNITS = 6;
+
   int m_id = 0;
   int m_resource = 0;
   int m_population_max = 0;
@@ -25,14 +29,14 @@ public:
 
 public:
   game_step_t (const PlayerView &_playerView, DebugInterface *_debugInterface, Action &_result);
-  Vec2Int get_place_for_HOUSE () const;
-  bool need_build (EntityType type) const;
-};
+  bool buy_entity (const EntityType type, const int cnt = 1);
 
-class task_groups_t
-{
-public:
-  static std::unordered_map<int, const Entity *> m_builder;
 
-  static void update (const game_step_t &game_step);
+  Vec2Int get_place_for (const EntityType type) const;
+  bool need_build (const EntityType type) const;
+  int entity_price (const EntityType type, const int cnt = 1) const;
+
+  int get_count (const EntityType type) const;
+  Vec2Int get_res_pos () const;
+  const std::vector<const Entity*> &get_vector (const EntityType type) const;
 };
