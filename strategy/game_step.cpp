@@ -4,7 +4,7 @@ std::unordered_map<EntityType, std::vector<Vec2Int>> game_step_t::init_places_fo
 {
   std::unordered_map<EntityType, std::vector<Vec2Int>> res;
   res[HOUSE]  = { {0, 0}, {3, 0}, {0, 3}, {6, 0}, {0, 6}, {9, 0}, {0, 9}, {12, 0}, {0, 12}, {15, 0}, {0, 15} };
-  res[TURRET] = { {15, 15}, {20, 6}, {6, 20} };
+  res[TURRET] = { {15, 15}, {20, 6}, {6, 20}, {19, 12}, {12, 19}, {2, 20}, {20, 2} };
   res[BUILDER_BASE] = { {5, 5} };
   res[MELEE_BASE] = { {5, 15} };
   res[RANGED_BASE] = { {15, 5} };
@@ -30,7 +30,8 @@ game_step_t::game_step_t (const PlayerView &_playerView, DebugInterface *_debugI
         m_entity[entity.entityType].push_back (&entity);
 
         const EntityProperties &properties = playerView->entityProperties.at (entity.entityType);
-        m_population_max += properties.populationProvide;
+        if (entity.active)
+          m_population_max += properties.populationProvide;
         m_population_use += properties.populationUse;
       }
     else if (entity.entityType == RESOURCE)
@@ -68,13 +69,16 @@ bool game_step_t::need_build (const EntityType type) const
     {
       case BUILDER_UNIT: return get_count (BUILDER_UNIT) < std::max (MIN_BUILDER_UNITS, m_population_max * 3 / 10);
       case RANGED_UNIT : return !need_build (BUILDER_UNIT);
-      case MELEE_UNIT  : return !need_build (BUILDER_UNIT);
+      case MELEE_UNIT  : return !need_build (BUILDER_UNIT) && get_count (MELEE_UNIT) < get_count (RANGED_UNIT) * 2;
 
       case HOUSE       :
         return    get_count (BUILDER_UNIT) >= MIN_BUILDER_UNITS
                && m_res_pos.x + m_res_pos.y >= 6
-               && 1.0 * m_population_use / m_population_max > 0.7;
-      case TURRET      : return get_count (BUILDER_UNIT) >= MIN_BUILDER_UNITS;
+               && m_population_use + 5 >= m_population_max;
+      case TURRET      :
+        return    get_count (BUILDER_UNIT) >= MIN_BUILDER_UNITS
+               && get_count (RANGED_UNIT) + get_count (MELEE_UNIT) > get_count (TURRET)
+               && m_population_use >= 20;
       default: break;
     }
   return false;
@@ -128,6 +132,11 @@ int game_step_t::get_count (const EntityType type) const
   if (!m_entity.count (type))
     return 0;
   return m_entity.at (type).size ();
+}
+
+int game_step_t::get_army_count () const
+{
+  return get_count (RANGED_UNIT) + get_count (MELEE_UNIT);
 }
 
 const std::vector<const Entity *> &game_step_t::get_vector (const EntityType type) const
@@ -195,26 +204,26 @@ void game_step_t::try_build (const EntityType buildType, Action& result)
   result.entityActions[entity->id] = EntityAction (moveAction, buildAction, atackAction, repairAction);
 }
 
-void game_step_t::try_train_unit (const EntityType factoryType, Action &result)
+void game_step_t::train_unit (const EntityType factoryType, Action &result)
 {
   for (const Entity *entity : get_vector (factoryType))
     {
       const EntityProperties &properties = playerView->entityProperties.at (entity->entityType);
       EntityType buildType = properties.build->options[0];
 
-      if (!need_build (buildType))
-        continue;
-
       std::shared_ptr<MoveAction>   moveAction   = nullptr;
       std::shared_ptr<BuildAction>  buildAction  = nullptr;
       std::shared_ptr<AttackAction> atackAction  = nullptr;
       std::shared_ptr<RepairAction> repairAction = nullptr;
 
-      //TO-DO: build in different places + check emptiness
-      buildAction = std::shared_ptr<BuildAction> (new BuildAction (buildType, Vec2Int (entity->position.x + properties.size, entity->position.y + properties.size - 1)));
+      if (need_build (buildType))
+        {
+          //TO-DO: build in different places + check emptiness
+          buildAction = std::shared_ptr<BuildAction> (new BuildAction (buildType, Vec2Int (entity->position.x + properties.size, entity->position.y + properties.size - 1)));
 
-      make_busy (entity);
-      buy_entity (buildType);
+          make_busy (entity);
+          buy_entity (buildType);
+        }
 
       result.entityActions[entity->id] = EntityAction (moveAction, buildAction, atackAction, repairAction);
     }

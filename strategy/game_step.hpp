@@ -39,6 +39,7 @@ public:
   int entity_price (const EntityType type, const int cnt = 1) const;
 
   int get_count (const EntityType type) const;
+  int get_army_count () const;
   Vec2Int get_res_pos () const;
   const std::vector<const Entity*> &get_vector (const EntityType type) const;
   bool is_busy (const Entity *entity) const;
@@ -50,6 +51,6 @@ public:
   bool buy_entity (const EntityType type, const int cnt = 1);
   void make_busy (const Entity *entity);
   void try_build      (const EntityType buildType  , Action& result);
-  void try_train_unit (const EntityType factoryType, Action& result);
+  void train_unit (const EntityType factoryType, Action& result);
   void check_repair   (const EntityType repairType , Action& result);
 };
