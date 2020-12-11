@@ -1,6 +1,6 @@
 #pragma once
 
-#include "MyStrategy.hpp"
+#include "../MyStrategy.hpp"
 #include <exception>
 
 void strategy_0 (const PlayerView& playerView, DebugInterface* debugInterface, Action &result)

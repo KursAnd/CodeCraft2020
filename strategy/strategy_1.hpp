@@ -1,6 +1,5 @@
 #pragma once
 #include "game_step.hpp"
-#include <iostream>
 
 void strategy_1 (const PlayerView& playerView, DebugInterface* debugInterface, Action& result)
 {

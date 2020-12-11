@@ -24,7 +24,7 @@ game_step_t::game_step_t (const PlayerView &_playerView, DebugInterface *_debugI
       }
 
   for (const Entity &entity : playerView->entities)
-    if (entity.playerId != nullptr &&*entity.playerId == m_id)
+    if (entity.playerId != nullptr && *entity.playerId == m_id)
       {
         m_entity_set[entity.entityType].insert (entity.id);
         m_entity[entity.entityType].push_back (&entity);
@@ -298,7 +298,7 @@ void game_step_t::move_army (const EntityType type, Action& result)
       if (get_army_count () > 20)
         moveAction = std::shared_ptr<MoveAction> (new MoveAction (Vec2Int (playerView->mapSize - 1, playerView->mapSize - 1), true, true));
       else
-        moveAction = std::shared_ptr<MoveAction> (new MoveAction (Vec2Int (10 + rand () % 11, 10 + rand () % 11), true, false));
+        moveAction = std::shared_ptr<MoveAction> (new MoveAction (Vec2Int (10 + rand () % 14, 10 + rand () % 14), true, false));
 
       result.entityActions[entity->id] = EntityAction (moveAction, buildAction, atackAction, repairAction);
     }
