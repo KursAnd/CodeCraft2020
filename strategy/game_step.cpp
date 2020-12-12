@@ -2,6 +2,7 @@
 
 
 std::unordered_map<int, int> game_step_t::repair_tasks;
+std::unordered_map<int, Vec2Int> game_step_t::move_tasks;
 
 std::unordered_map<EntityType, std::vector<Vec2Int>> game_step_t::init_places_for_building ()
 {
@@ -41,6 +42,7 @@ game_step_t::game_step_t (const PlayerView &_playerView, DebugInterface *_debugI
         const EntityProperties &properties = playerView->entityProperties.at (entity.entityType);
         if (entity.active)
           m_population_max += properties.populationProvide;
+        m_population_max_future += properties.populationProvide;
         m_population_use += properties.populationUse;
       }
     else if (entity.entityType == RESOURCE)
@@ -83,7 +85,7 @@ bool game_step_t::need_build (const EntityType type) const
       case HOUSE       :
         return    get_count (BUILDER_UNIT) >= MIN_BUILDER_UNITS
                && m_res_pos.x + m_res_pos.y >= 6
-               && m_population_use + 5 >= m_population_max;
+               && m_population_use + 5 >= m_population_max_future;
       case TURRET      :
         return    get_count (BUILDER_UNIT) >= MIN_BUILDER_UNITS
                && get_count (RANGED_UNIT) + get_count (MELEE_UNIT) > get_count (TURRET)
@@ -315,10 +317,12 @@ void game_step_t::move_army (const EntityType type, Action& result)
       std::shared_ptr<AttackAction> atackAction  = std::shared_ptr<AttackAction> (new AttackAction (nullptr, std::shared_ptr<AutoAttack> (new AutoAttack (properties.sightRange, {}))));;
       std::shared_ptr<RepairAction> repairAction = nullptr;
 
-      if (get_army_count () > 20)
-        moveAction = std::shared_ptr<MoveAction> (new MoveAction (Vec2Int (playerView->mapSize - 1, playerView->mapSize - 1), true, true));
+      if (entity.id % 4 < 2)
+        moveAction = std::shared_ptr<MoveAction> (new MoveAction (Vec2Int (10 + rand () % 13, 10 + rand () % 13), true, false));
+      else if (entity.id % 4 == 2)
+        moveAction = std::shared_ptr<MoveAction> (new MoveAction (Vec2Int (20 + rand () % 4, 3 + rand () % 12), true, false));
       else
-        moveAction = std::shared_ptr<MoveAction> (new MoveAction (Vec2Int (10 + rand () % 14, 10 + rand () % 14), true, false));
+        moveAction = std::shared_ptr<MoveAction> (new MoveAction (Vec2Int (3 + rand () % 12, 20 + rand () % 4), true, false));
 
       result.entityActions[entity.id] = EntityAction (moveAction, buildAction, atackAction, repairAction);
     }
@@ -349,6 +353,7 @@ void game_step_t::run_tasks ()
       int id_rep = task.second;
       if (!m_entity_by_id.count (id) || !m_entity_by_id.count (id_rep))
         {
+          repair_ids[id_rep]--;
           finished.insert (id);
           continue;
         }
@@ -356,6 +361,7 @@ void game_step_t::run_tasks ()
       const EntityProperties &properties = playerView->entityProperties.at (entity.entityType);
       if (entity.health >= properties.maxHealth)
         {
+          repair_ids.erase (id_rep);
           finished.insert (id);
           continue;
         }
@@ -364,15 +370,43 @@ void game_step_t::run_tasks ()
     }
   for (const int id : finished)
     game_step_t::repair_tasks.erase (id);
+  finished.clear ();
+
+  for (auto &task : game_step_t::move_tasks)
+    {
+      int id = task.first;
+      Vec2Int pos = task.second;
+      if (!m_entity_by_id.count (id))
+        {
+          finished.insert (id);
+          continue;
+        }
+      const Entity &entity = m_entity_by_id[id];
+      // TO-DO: cancel and go to heal by health
+      if (entity.position == pos) // TO-DO: or near it
+        {
+          finished.insert (id);
+          continue;
+        }
+      make_busy (id);
+    }
+  for (const int id : finished)
+    game_step_t::move_tasks.erase (id);
 }
 
 
 void game_step_t::add_repair_task (const int id, const int id_rep)
 {
-  // TO-DO: allow to repair by several builders
-  if (repair_ids.count (id_rep))
+  // TO-DO: allow to repair by several builders analiticaly
+  if (repair_ids[id_rep] >= 2)
     return;
   game_step_t::repair_tasks[id] = id_rep;
   repair_ids[id_rep]++;
+  make_busy (id);
+}
+
+void game_step_t::add_move_task (const int id, const Vec2Int pos)
+{
+  game_step_t::move_tasks[id] = pos;
   make_busy (id);
 }

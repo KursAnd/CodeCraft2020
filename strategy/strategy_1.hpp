@@ -1,8 +1,15 @@
 #pragma once
 #include "game_step.hpp"
+#include <time.h>
+#include <cstdlib>
 
 void strategy_1 (const PlayerView& playerView, DebugInterface* debugInterface, Action& result)
 {
+  if (playerView.currentTick == 0)
+    {
+      srand(time(NULL));
+    }
+
   game_step_t gs (playerView, debugInterface, result);
 
   gs.run_tasks ();

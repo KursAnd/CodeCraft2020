@@ -21,6 +21,7 @@ private:
   int m_id = 0;
   int m_resource = 0;
   int m_population_max = 0;
+  int m_population_max_future = 0; // include inactive houses
   int m_population_use = 0;
 
   Vec2Int m_res_pos;  // purpouse for BUILDERs who collect thr resources
@@ -34,6 +35,7 @@ private:
   
   std::unordered_map<int, int> repair_ids;
   static std::unordered_map<int, int> repair_tasks;
+  static std::unordered_map<int, Vec2Int> move_tasks;
 
 public:
   game_step_t (const PlayerView &_playerView, DebugInterface *_debugInterface, Action &_result);
@@ -67,4 +69,5 @@ public:
 
   void run_tasks ();
   void add_repair_task (const int id, const int id_rep);
-  };
+  void add_move_task (const int id, const Vec2Int id_rep);
+};
