@@ -7,12 +7,13 @@ std::unordered_map<int, Vec2Int> game_step_t::attack_move_tasks;
 std::unordered_map<EntityType, std::vector<Vec2Int>> game_step_t::init_places_for_building ()
 {
   std::unordered_map<EntityType, std::vector<Vec2Int>> res;
-  res[HOUSE]  = { {0, 0}, {3, 0}, {0, 3}, {6, 0}, {0, 6}, {9, 0}, {0, 9}, {12, 0}, {0, 12}, {15, 0}, {0, 15}, {11, 3}, {3, 11}, {11, 6}, {6, 11} };
-  res[TURRET] = { {15, 15}, {20, 7}, {7, 20}, {19, 12}, {12, 19}, {2, 20}, {20, 2}, {20, 5}, {5, 20}, {17, 12}, {12, 17}, {15, 12}, {12, 15} };
+  res[HOUSE]  = { {0, 0}, {4, 0}, {0, 4}, {7, 0}, {0, 7}, {10, 0}, {0, 10}, {13, 0}, {0, 13}, {11, 3}, {3, 11}, {16, 0}, {0, 16}, {11, 6}, {6, 11}, {13, 11}, {10, 11} };
+  res[TURRET] = { {15, 15}, {20, 7}, {7, 20}, {5, 20}, {20, 5}, {16, 13}, {13, 16}, {2, 20}, {20, 2}, {17, 11}, {11, 17}, {11, 19}, {19, 11}, {20, 0}, {0, 20} };
   res[BUILDER_BASE] = { {5, 5} };
   res[MELEE_BASE] = { {5, 15} };
   res[RANGED_BASE] = { {15, 5} };
-  res[WALL] = {};
+  res[WALL] = { {22, 7}, {22, 8}, {7, 22}, {8, 22}, {22, 6}, {6, 22}, {22, 9}, {9, 22}, {22, 5}, {5, 22}, {22, 4}, {4, 22}, {21, 9}, {9, 21}, {17, 15}, {15, 17}, {17, 16}, {16, 17},
+    {18, 13}, {13, 18}, {18, 14}, {14, 18}, {19, 13}, {13, 19}, {20, 13}, {13, 20}, {21, 12}, {12, 21}, {21, 11}, {11, 21}, {22, 3}, {3, 22}, {22, 2}, {2, 22}, {22, 1}, {1, 22}, {22, 0}, {0, 22}};
   return res;
 }
 std::unordered_set<int> game_step_t::destroyed_pos;
@@ -122,13 +123,11 @@ Vec2Int game_step_t::get_place_for (const EntityType type) const
 
   if (priority[type].size () > get_count (type))
     {
-      std::unordered_set<int> exclude;
-      for (const Entity &entity : get_vector (type))
-        exclude.insert (entity.position.x * playerView->mapSize + entity.position.y);
-
       for (const Vec2Int &vec2 : priority[type])
-        if (!exclude.count (vec2.x * playerView->mapSize + vec2.y))
-          return vec2;
+        {
+          if (is_empty_space_for_type (vec2, type))
+            return vec2;
+        }
     }
   return Vec2Int (-1, -1);
 }
@@ -144,13 +143,18 @@ bool game_step_t::need_build (const EntityType type) const
       case MELEE_UNIT  : return !need_build (BUILDER_UNIT) && get_count (MELEE_UNIT) < get_count (RANGED_UNIT) * 2;
 
       case HOUSE       :
-        return    get_count (BUILDER_UNIT) >= MIN_BUILDER_UNITS
-               && m_res_pos.x + m_res_pos.y >= 6
-               && m_population_use + 5 >= m_population_max_future;
+        return get_count (BUILDER_UNIT) >= MIN_BUILDER_UNITS
+            && m_population_use + 5 >= m_population_max_future;
       case TURRET      :
-        return    get_count (BUILDER_UNIT) >= MIN_BUILDER_UNITS
-               && get_count (RANGED_UNIT) + get_count (MELEE_UNIT) > get_count (TURRET)
-               && m_population_use >= 20;
+        return get_count (BUILDER_UNIT) >= MIN_BUILDER_UNITS
+            && get_count (BUILDER_UNIT) > get_count (TURRET)
+            && 1.0 * m_population_use / m_population_max > 0.65;
+      case WALL        :
+        return get_count (BUILDER_UNIT) >= MIN_BUILDER_UNITS
+            && get_count (TURRET) > 3
+            && get_count (WALL) < get_count (TURRET) * 2
+            && 1.0 * m_population_use / m_population_max > 70
+            && m_resource > 50; 
       default: break;
     }
   return false;
@@ -235,6 +239,18 @@ int game_step_t::get_army_count () const
 bool game_step_t::is_busy (const Entity &entity) const
 {
   return ids_was.count (entity.id);
+}
+
+bool game_step_t::is_empty_space_for_type (const Vec2Int pos, const EntityType type) const
+{
+  const EntityProperties &properties = playerView->entityProperties.at (type);
+  for (int x = pos.x; x < pos.x + properties.size; ++x)
+    for (int y = pos.y; y < pos.y + properties.size; ++y)
+      {
+        if (map[x][y] >= 0)
+          return false;
+      }
+  return true;
 }
 
 bool game_step_t::is_near (const Vec2Int &pos_a, const Vec2Int &pos_b, const int dist)

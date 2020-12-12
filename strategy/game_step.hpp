@@ -56,6 +56,7 @@ public:
   std::vector<Entity> &get_vector (const EntityType type);
   const std::vector<Entity> &get_vector (const EntityType type) const;
   bool is_busy (const Entity &entity) const;
+  bool is_empty_space_for_type (const Vec2Int pos, const EntityType type) const;
   
   static bool is_near (const Vec2Int &pos_a, const Vec2Int &pos_b, const int dist = 0);
   static int get_distance (const Entity &ent_a, const Entity &ent_b);
