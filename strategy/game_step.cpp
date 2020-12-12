@@ -2,7 +2,7 @@
 
 
 std::unordered_map<int, int> game_step_t::repair_tasks;
-std::unordered_map<int, Vec2Int> game_step_t::move_tasks;
+std::unordered_map<int, Vec2Int> game_step_t::attack_move_tasks;
 
 std::unordered_map<EntityType, std::vector<Vec2Int>> game_step_t::init_places_for_building ()
 {
@@ -15,6 +15,7 @@ std::unordered_map<EntityType, std::vector<Vec2Int>> game_step_t::init_places_fo
   res[WALL] = {};
   return res;
 }
+std::unordered_set<int> game_step_t::destroyed_pos;
 
 int game_step_t::choose_atack_pos (const Vec2Int old_pos)
 {
@@ -224,6 +225,11 @@ bool game_step_t::is_busy (const Entity &entity) const
   return ids_was.count (entity.id);
 }
 
+bool game_step_t::is_near (const Vec2Int &pos_a, const Vec2Int &pos_b, const int dist)
+{
+  return std::abs (pos_a.x - pos_b.x) < dist && std::abs (pos_a.y - pos_b.y) < dist;
+}
+
 int game_step_t::get_distance (const Entity &ent_a, const Entity &ent_b)
 {
   return (ent_a.position.x - ent_b.position.x) * (ent_a.position.x - ent_b.position.x)
@@ -394,7 +400,7 @@ void game_step_t::turn_on_turrets (Action &result)
 
 void game_step_t::make_atack_groups (Action &result)
 {
-  if (get_army_count () - game_step_t::move_tasks.size () < 15 || get_count (TURRET) < 2)
+  if (get_army_count () - game_step_t::attack_move_tasks.size () < 15 || get_count (TURRET) < 2)
     return;
 
   if (rand () % 20 == 0)
@@ -404,13 +410,13 @@ void game_step_t::make_atack_groups (Action &result)
         return;
       for (const Entity &entity : get_vector (RANGED_UNIT))
         {
-          if (rand () % 4 == 0) // 75%
+          if (rand () % 4 == 0 || is_busy (entity)) // 75%
             continue;
           move_solder (entity, attack_pos[dir], result);
         }
       for (const Entity &entity : get_vector (MELEE_UNIT))
         {
-          if (rand () % 4 == 0) // 75%
+          if (rand () % 4 == 0 || is_busy (entity)) // 75%
             continue;
           move_solder (entity, attack_pos[dir], result);
         }
@@ -418,10 +424,7 @@ void game_step_t::make_atack_groups (Action &result)
 }
 
 void game_step_t::move_solder (const Entity &entity, const Vec2Int &pos, Action& result, bool need_add_task)
-{      
-  if (is_busy (entity))
-    return;
-
+{
   const EntityProperties &properties = playerView->entityProperties.at (entity.entityType);
 
   std::shared_ptr<MoveAction>   moveAction   = std::shared_ptr<MoveAction> (new MoveAction (pos, true, true));;
@@ -431,6 +434,8 @@ void game_step_t::move_solder (const Entity &entity, const Vec2Int &pos, Action&
   
   if (need_add_task)
     add_move_task (entity.id, pos);
+  else
+    make_busy (entity.id);
   result.entityActions[entity.id] = EntityAction (moveAction, buildAction, atackAction, repairAction);
 }
 
@@ -462,7 +467,9 @@ void game_step_t::run_tasks (Action& result)
     game_step_t::repair_tasks.erase (id);
   finished.clear ();
 
-  for (auto &task : game_step_t::move_tasks)
+  bool need_redirect = false;
+  Vec2Int vec_old (0,0), vec_new (0, 0);
+  for (auto &task : game_step_t::attack_move_tasks)
     {
       int id = task.first;
       Vec2Int pos = task.second;
@@ -473,7 +480,7 @@ void game_step_t::run_tasks (Action& result)
         }
       const Entity &entity = m_entity_by_id[id];
       // TO-DO: cancel and go to heal by health
-      if (entity.position == pos) // TO-DO: or near it
+      if (is_near (entity.position, pos, 2))
         {
           int old_dir = get_id_pos_by_vec (pos);
           destroyed_pos.insert (old_dir);
@@ -483,16 +490,18 @@ void game_step_t::run_tasks (Action& result)
             finished.insert (id);
           else
             {
-              move_solder (m_entity_by_id[id], attack_pos[new_dir], result, false);
-              task.second = attack_pos[new_dir];
-              make_busy (id);
+              need_redirect = true;
+              vec_old = pos;
+              vec_new = attack_pos[new_dir];
             }
           continue;
         }
       make_busy (id);
     }
   for (const int id : finished)
-    game_step_t::move_tasks.erase (id);
+    game_step_t::attack_move_tasks.erase (id);
+  if (need_redirect)
+    redirect_all_atack_move_tasks (vec_old, vec_new, result);
 }
 
 
@@ -508,6 +517,20 @@ void game_step_t::add_repair_task (const int id, const int id_rep)
 
 void game_step_t::add_move_task (const int id, const Vec2Int pos)
 {
-  game_step_t::move_tasks[id] = pos;
+  game_step_t::attack_move_tasks[id] = pos;
   make_busy (id);
+}
+
+void game_step_t::redirect_all_atack_move_tasks (const Vec2Int old_pos, const Vec2Int new_pos, Action &result)
+{
+  for (auto &task : game_step_t::attack_move_tasks)
+    {
+      const int id = task.first;
+      const Vec2Int pos = task.second;
+      if (pos == old_pos)
+        {
+          move_solder (m_entity_by_id[id], new_pos, result, false);
+          task.second = new_pos;
+        }
+    }
 }

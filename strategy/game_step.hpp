@@ -14,8 +14,8 @@ private:
   Action *result;
 
   static std::unordered_map<EntityType, std::vector<Vec2Int>> init_places_for_building ();
+  static std::unordered_set<int> destroyed_pos;
   std::vector<Vec2Int> attack_pos;
-  std::unordered_set<int> destroyed_pos;
   int choose_atack_pos (const Vec2Int old_pos = Vec2Int (-1, -1));
   int get_id_pos_by_vec (const Vec2Int pos);
 
@@ -38,7 +38,7 @@ private:
   
   std::unordered_map<int, int> repair_ids;
   static std::unordered_map<int, int> repair_tasks;
-  static std::unordered_map<int, Vec2Int> move_tasks;
+  static std::unordered_map<int, Vec2Int> attack_move_tasks;
 
 public:
   game_step_t (const PlayerView &_playerView, DebugInterface *_debugInterface, Action &_result);
@@ -55,10 +55,11 @@ public:
   std::vector<Entity> &get_vector (const EntityType type);
   const std::vector<Entity> &get_vector (const EntityType type) const;
   bool is_busy (const Entity &entity) const;
-
+  
+  static bool is_near (const Vec2Int &pos_a, const Vec2Int &pos_b, const int dist = 0);
   static int get_distance (const Entity &ent_a, const Entity &ent_b);
   int get_distance (const Vec2Int &pos, const Entity &ent_b, const EntityType type) const;
-
+  
 
   bool buy_entity (const EntityType type, const int cnt = 1);
   void make_busy (const Entity &entity);
@@ -75,4 +76,5 @@ public:
   void run_tasks (Action &result);
   void add_repair_task (const int id, const int id_rep);
   void add_move_task (const int id, const Vec2Int id_rep);
+  void redirect_all_atack_move_tasks (const Vec2Int old_pos, const Vec2Int new_pos, Action &result);
 };
