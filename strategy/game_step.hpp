@@ -41,6 +41,8 @@ public:
   int get_count (const EntityType type) const;
   int get_army_count () const;
   Vec2Int get_res_pos () const;
+  std::vector<Entity> &get_vector (const EntityType type);
+  const std::vector<Entity> &get_vector (const EntityType type) const;
   bool is_busy (const Entity &entity) const;
 
   static int get_distance (const Entity &ent_a, const Entity &ent_b);

@@ -16,6 +16,10 @@ game_step_t::game_step_t (const PlayerView &_playerView, DebugInterface *_debugI
   : playerView (&_playerView), debugInterface (_debugInterface), result (&_result),
     m_res_pos (_playerView.mapSize - 1, _playerView.mapSize - 1)
 {
+  // hack to avoid const wraper that doesn't work on platform ..
+  for (const EntityType tupe : {WALL, HOUSE, BUILDER_BASE, BUILDER_UNIT, MELEE_BASE,  MELEE_UNIT, RANGED_BASE, RANGED_UNIT, RESOURCE, TURRET})
+    m_entity[tupe] = std::vector <Entity> ();
+
   m_id = playerView->myId;
   for (const auto &player : playerView->players)
     if (player.id == m_id)
@@ -51,9 +55,8 @@ Vec2Int game_step_t::get_place_for (const EntityType type) const
   if (priority[type].size () > get_count (type))
     {
       std::unordered_set<int> exclude;
-      if (m_entity.count (type))
-        for (const Entity entity : m_entity.at (type))
-          exclude.insert (entity.position.x * playerView->mapSize + entity.position.y);
+      for (const Entity &entity : get_vector (type))
+        exclude.insert (entity.position.x * playerView->mapSize + entity.position.y);
 
       for (const Vec2Int &vec2 : priority[type])
         if (!exclude.count (vec2.x * playerView->mapSize + vec2.y))
@@ -133,6 +136,17 @@ Vec2Int game_step_t::get_res_pos () const
   return m_res_pos;
 }
 
+std::vector<Entity> &game_step_t::get_vector (const EntityType type)
+{
+  return m_entity[type];
+}
+
+const std::vector<Entity> &game_step_t::get_vector (const EntityType type) const
+{
+  // safe becouse of hack in game_step_t::game_step_t
+  return m_entity.at (type);
+}
+
 int game_step_t::get_count (const EntityType type) const
 {
   if (!m_entity.count (type))
@@ -172,11 +186,8 @@ void game_step_t::try_build (const EntityType buildType, Action& result)
   if (pos.x < 0)
     return;
 
-  if (!m_entity.count (BUILDER_UNIT))
-    return;
-
   const Entity *entity = nullptr;
-  for (const Entity &_entity : m_entity.at (BUILDER_UNIT))
+  for (const Entity &_entity : get_vector (BUILDER_UNIT))
     if (   !ids_was.count (_entity.id)
         && (!entity || get_distance (pos, _entity, buildType) < get_distance (pos, *entity, buildType)))
       entity = &_entity;
@@ -208,9 +219,7 @@ void game_step_t::try_build (const EntityType buildType, Action& result)
 
 void game_step_t::train_unit (const EntityType factoryType, Action &result)
 {
-  if (!m_entity.count (factoryType))
-    return;
-  for (const Entity &entity : m_entity.at (factoryType))
+  for (const Entity &entity : get_vector (factoryType))
     {
       const EntityProperties &properties = playerView->entityProperties.at (entity.entityType);
       EntityType buildType = properties.build->options[0];
@@ -235,9 +244,7 @@ void game_step_t::train_unit (const EntityType factoryType, Action &result)
 
 void game_step_t::check_repair (const EntityType repairType, Action &result)
 {
-  if (!m_entity.count (repairType) || !m_entity.count (BUILDER_UNIT))
-    return;
-  for (const Entity &repair_entity : m_entity.at (repairType))
+  for (const Entity &repair_entity : get_vector (repairType))
     {
       const EntityProperties &properties = playerView->entityProperties.at (repair_entity.entityType);
 
@@ -246,7 +253,7 @@ void game_step_t::check_repair (const EntityType repairType, Action &result)
 
       // TO-DO: let rebuild all workers near building
       const Entity *entity = nullptr;
-      for (const Entity _entity : m_entity.at (BUILDER_UNIT))
+      for (const Entity _entity : get_vector (BUILDER_UNIT))
         if (!is_busy (_entity) && (!entity || get_distance (repair_entity, _entity) < get_distance (repair_entity, *entity)))
           entity = &_entity;
 
@@ -267,10 +274,8 @@ void game_step_t::move_builders (Action &result)
 {
   const EntityType type = BUILDER_UNIT;
   const EntityProperties &properties = playerView->entityProperties.at (type);
-  if (!m_entity.count (type))
-    return;
 
-  for (const Entity &entity : m_entity.at (type))
+  for (const Entity &entity : get_vector (type))
     {
       if (is_busy (entity))
         continue;
@@ -287,10 +292,8 @@ void game_step_t::move_builders (Action &result)
 void game_step_t::move_army (const EntityType type, Action& result)
 {
   const EntityProperties &properties = playerView->entityProperties.at (type);
-  if (!m_entity.count (type))
-    return;
   
-  for (const Entity &entity : m_entity.at (type))
+  for (const Entity &entity : get_vector (type))
     {
       if (is_busy (entity))
         continue;
@@ -313,10 +316,8 @@ void game_step_t::turn_on_turrets (Action &result)
 {
   const EntityType type = TURRET;
   const EntityProperties &properties = playerView->entityProperties.at (type);
-  if (!m_entity.count (type))
-    return;
 
-  for (const Entity &entity : m_entity.at (type))
+  for (const Entity &entity : get_vector (type))
     {
       std::shared_ptr<MoveAction>   moveAction   = nullptr;
       std::shared_ptr<BuildAction>  buildAction  = nullptr;
