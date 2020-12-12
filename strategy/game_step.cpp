@@ -1,7 +1,7 @@
 #include "game_step.hpp"
 
 
-std::unordered_map<int, std::function<bool(int)>> game_step_t::tasks; 
+std::unordered_map<int, int> game_step_t::repair_tasks;
 
 std::unordered_map<EntityType, std::vector<Vec2Int>> game_step_t::init_places_for_building ()
 {
@@ -277,7 +277,7 @@ void game_step_t::check_repair (const EntityType repairType, Action &result)
       std::shared_ptr<AttackAction> atackAction  = nullptr;
       std::shared_ptr<RepairAction> repairAction = std::shared_ptr<RepairAction> (new RepairAction (repair_entity.id));
 
-      make_busy (*entity);
+      add_repair_task (entity->id, repair_entity.id);
       result.entityActions[entity->id] = EntityAction (moveAction, buildAction, atackAction, repairAction);
     }
 }
@@ -343,22 +343,36 @@ void game_step_t::turn_on_turrets (Action &result)
 void game_step_t::run_tasks ()
 {
   std::unordered_set<int> finished;
-  for (auto &task : game_step_t::tasks)
+  for (auto &task : game_step_t::repair_tasks)
     {
       int id = task.first;
-      auto func = task.second;
-      if (!m_entity_by_id.count (id) || func (id))
+      int id_rep = task.second;
+      if (!m_entity_by_id.count (id) || !m_entity_by_id.count (id_rep))
         {
           finished.insert (id);
           continue;
         }
+      const Entity &entity = m_entity_by_id[id_rep];
+      const EntityProperties &properties = playerView->entityProperties.at (entity.entityType);
+      if (entity.health >= properties.maxHealth)
+        {
+          finished.insert (id);
+          continue;
+        }
+      repair_ids[id_rep]++;
       make_busy (id);
     }
   for (const int id : finished)
-    game_step_t::tasks.erase (id);
+    game_step_t::repair_tasks.erase (id);
 }
 
-void game_step_t::add_task (const int id, std::function<bool (int)> func)
+
+void game_step_t::add_repair_task (const int id, const int id_rep)
 {
-  game_step_t::tasks[id] = func;
+  // TO-DO: allow to repair by several builders
+  if (repair_ids.count (id_rep))
+    return;
+  game_step_t::repair_tasks[id] = id_rep;
+  repair_ids[id_rep]++;
+  make_busy (id);
 }

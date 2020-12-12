@@ -31,8 +31,9 @@ private:
   std::unordered_map<EntityType, std::unordered_set<int>> m_entity_set;
   std::unordered_map<EntityType, std::vector<Entity>> m_entity;
   std::unordered_set<int> ids_was;
-
-  static std::unordered_map<int, std::function<bool(int)>> tasks;  
+  
+  std::unordered_map<int, int> repair_ids;
+  static std::unordered_map<int, int> repair_tasks;
 
 public:
   game_step_t (const PlayerView &_playerView, DebugInterface *_debugInterface, Action &_result);
@@ -65,5 +66,5 @@ public:
   void turn_on_turrets (Action& result);
 
   void run_tasks ();
-  void add_task (const int id, std::function<bool(int)> func);
+  void add_repair_task (const int id, const int id_rep);
   };
