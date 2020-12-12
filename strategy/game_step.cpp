@@ -28,6 +28,17 @@ int game_step_t::choose_atack_pos (const Vec2Int old_pos)
         return 1;
     }
 
+  if (old_pos.x == -1 && (!destroyed_pos.count (0) || !destroyed_pos.count (2)))
+    {
+      int dir = -1;
+      do
+        {
+          dir = (rand () % 2) * 2;
+        }
+      while (destroyed_pos.count (dir));
+      return dir;
+    }
+
   int dir = -1;
   do
     {
