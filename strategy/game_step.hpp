@@ -4,6 +4,7 @@
 #include <unordered_set>
 #include <unordered_map>
 #include <set>
+#include <functional>
 
 class game_step_t
 {
@@ -25,9 +26,13 @@ private:
   Vec2Int m_res_pos;  // purpouse for BUILDERs who collect thr resources
   bool collect_money = false;
 
+  std::unordered_map<int, EntityType> m_entity_type_by_id;
+  std::unordered_map<int, Entity> m_entity_by_id;
   std::unordered_map<EntityType, std::unordered_set<int>> m_entity_set;
   std::unordered_map<EntityType, std::vector<Entity>> m_entity;
   std::unordered_set<int> ids_was;
+
+  static std::unordered_map<int, std::function<bool(int)>> tasks;  
 
 public:
   game_step_t (const PlayerView &_playerView, DebugInterface *_debugInterface, Action &_result);
@@ -51,10 +56,14 @@ public:
 
   bool buy_entity (const EntityType type, const int cnt = 1);
   void make_busy (const Entity &entity);
+  void make_busy (const int id);
   void try_build      (const EntityType buildType, Action& result);
   void train_unit (const EntityType factoryType, Action& result);
   void check_repair   (const EntityType repairType, Action& result);
   void move_builders (Action& result);
   void move_army (const EntityType type, Action& result);
   void turn_on_turrets (Action& result);
-  };  
+
+  void run_tasks ();
+  void add_task (const int id, std::function<bool(int)> func);
+  };

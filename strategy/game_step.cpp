@@ -1,5 +1,8 @@
 #include "game_step.hpp"
 
+
+std::unordered_map<int, std::function<bool(int)>> game_step_t::tasks; 
+
 std::unordered_map<EntityType, std::vector<Vec2Int>> game_step_t::init_places_for_building ()
 {
   std::unordered_map<EntityType, std::vector<Vec2Int>> res;
@@ -30,6 +33,8 @@ game_step_t::game_step_t (const PlayerView &_playerView, DebugInterface *_debugI
   for (const Entity &entity : playerView->entities)
     if (entity.playerId != nullptr && *entity.playerId == m_id)
       {
+        m_entity_type_by_id[entity.id] = entity.entityType;
+        m_entity_by_id[entity.id] = entity;
         m_entity_set[entity.entityType].insert (entity.id);
         m_entity[entity.entityType].push_back (entity);
 
@@ -131,6 +136,11 @@ void game_step_t::make_busy (const Entity &entity)
   ids_was.insert (entity.id);
 }
 
+void game_step_t::make_busy (const int id)
+{
+  ids_was.insert (id);
+}
+
 Vec2Int game_step_t::get_res_pos () const
 {
   return m_res_pos;
@@ -188,10 +198,11 @@ void game_step_t::try_build (const EntityType buildType, Action& result)
 
   const Entity *entity = nullptr;
   for (const Entity &_entity : get_vector (BUILDER_UNIT))
-    if (   !is_busy (_entity)
-        && (!entity || get_distance (pos, _entity, buildType) < get_distance (pos, *entity, buildType)))
-      entity = &_entity;
-
+    {
+      if (   !is_busy (_entity)
+          && (!entity || get_distance (pos, _entity, buildType) < get_distance (pos, *entity, buildType)))
+        entity = &_entity;
+    }
   if (!entity)
     return;
 
@@ -253,10 +264,11 @@ void game_step_t::check_repair (const EntityType repairType, Action &result)
 
       // TO-DO: let rebuild all workers near building
       const Entity *entity = nullptr;
-      for (const Entity _entity : get_vector (BUILDER_UNIT))
-        if (!is_busy (_entity) && (!entity || get_distance (repair_entity, _entity) < get_distance (repair_entity, *entity)))
-          entity = &_entity;
-
+      for (const Entity &_entity : get_vector (BUILDER_UNIT))
+        {
+          if (!is_busy (_entity) && (!entity || get_distance (repair_entity, _entity) < get_distance (repair_entity, *entity)))
+            entity = &_entity;
+        }
       if (!entity)
         continue;
 
@@ -326,4 +338,27 @@ void game_step_t::turn_on_turrets (Action &result)
 
       result.entityActions[entity.id] = EntityAction (moveAction, buildAction, atackAction, repairAction);
     }
+}
+
+void game_step_t::run_tasks ()
+{
+  std::unordered_set<int> finished;
+  for (auto &task : game_step_t::tasks)
+    {
+      int id = task.first;
+      auto func = task.second;
+      if (!m_entity_by_id.count (id) || func (id))
+        {
+          finished.insert (id);
+          continue;
+        }
+      make_busy (id);
+    }
+  for (const int id : finished)
+    game_step_t::tasks.erase (id);
+}
+
+void game_step_t::add_task (const int id, std::function<bool (int)> func)
+{
+  game_step_t::tasks[id] = func;
 }

@@ -5,6 +5,7 @@ void strategy_1 (const PlayerView& playerView, DebugInterface* debugInterface, A
 {
   game_step_t gs (playerView, debugInterface, result);
 
+  gs.run_tasks ();
 
   gs.check_repair (BUILDER_BASE, result);
   gs.check_repair (MELEE_BASE  , result);
