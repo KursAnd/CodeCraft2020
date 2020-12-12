@@ -344,6 +344,46 @@ void game_step_t::turn_on_turrets (Action &result)
     }
 }
 
+void game_step_t::make_atack_groups (Action &result)
+{
+  if (get_army_count () - game_step_t::move_tasks.size () < 15 || get_count (TURRET) < 2)
+    return;
+
+  if (rand () % 20 == 0)
+    {
+      static std::vector<Vec2Int> pos = {{playerView->mapSize - 5, 5}, {playerView->mapSize - 5, playerView->mapSize - 5}, {5, playerView->mapSize - 5}};
+      int dir = rand () % pos.size ();
+      for (const Entity &entity : get_vector (RANGED_UNIT))
+        {
+          if (rand () % 4 == 0) // 75%
+            continue;
+          move_solder (entity, pos[dir], result);
+        }
+      for (const Entity &entity : get_vector (MELEE_UNIT))
+        {
+          if (rand () % 4 == 0) // 75%
+            continue;
+          move_solder (entity, pos[dir], result);
+        }
+    }
+}
+
+void game_step_t::move_solder (const Entity &entity, const Vec2Int &pos, Action& result)
+{      
+  if (is_busy (entity))
+    return;
+
+  const EntityProperties &properties = playerView->entityProperties.at (entity.entityType);
+
+  std::shared_ptr<MoveAction>   moveAction   = std::shared_ptr<MoveAction> (new MoveAction (pos, true, true));;
+  std::shared_ptr<BuildAction>  buildAction  = nullptr;
+  std::shared_ptr<AttackAction> atackAction  = std::shared_ptr<AttackAction> (new AttackAction (nullptr, std::shared_ptr<AutoAttack> (new AutoAttack (properties.sightRange, {}))));;
+  std::shared_ptr<RepairAction> repairAction = nullptr;
+  
+  add_move_task (entity.id, pos);
+  result.entityActions[entity.id] = EntityAction (moveAction, buildAction, atackAction, repairAction);
+}
+
 void game_step_t::run_tasks ()
 {
   std::unordered_set<int> finished;

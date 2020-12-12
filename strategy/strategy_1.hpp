@@ -28,11 +28,11 @@ void strategy_1 (const PlayerView& playerView, DebugInterface* debugInterface, A
   gs.try_build (BUILDER_BASE, result);
   gs.try_build (MELEE_BASE  , result);
   gs.try_build (RANGED_BASE , result);
-  gs.try_build (TURRET      , result);
   gs.try_build (HOUSE       , result);
+  gs.try_build (TURRET      , result);
   gs.try_build (WALL        , result);
   
-  
+  gs.make_atack_groups (result);
   
   gs.move_builders (result);
   gs.move_army (RANGED_UNIT, result);

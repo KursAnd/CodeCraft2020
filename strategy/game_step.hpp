@@ -66,6 +66,8 @@ public:
   void move_builders (Action& result);
   void move_army (const EntityType type, Action& result);
   void turn_on_turrets (Action& result);
+  void make_atack_groups (Action &result);
+  void move_solder (const Entity &entity, const Vec2Int &pos, Action& result);
 
   void run_tasks ();
   void add_repair_task (const int id, const int id_rep);
