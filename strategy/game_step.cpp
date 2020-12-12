@@ -16,6 +16,40 @@ std::unordered_map<EntityType, std::vector<Vec2Int>> game_step_t::init_places_fo
   return res;
 }
 
+int game_step_t::choose_atack_pos (const Vec2Int old_pos)
+{
+  if (destroyed_pos.size () == attack_pos.size ())
+    destroyed_pos.clear ();
+
+  if (old_pos.x != -1)
+    {
+      int old_dir = get_id_pos_by_vec (old_pos);
+      if ((old_dir == 0 || old_dir == 2) && !destroyed_pos.count (1))
+        return 1;
+    }
+
+  int dir = -1;
+  do
+    {
+      dir = rand () % attack_pos.size ();
+    }
+  while (destroyed_pos.count (dir));
+
+  return dir;
+}
+
+int game_step_t::get_id_pos_by_vec (const Vec2Int pos)
+{
+  int dir = -1;
+  for (int i = 0; i < attack_pos.size (); ++i)
+    if (attack_pos[i] == pos)
+      {
+        dir = i;
+        break;
+      }
+  return dir;
+}
+
 game_step_t::game_step_t (const PlayerView &_playerView, DebugInterface *_debugInterface, Action &_result)
   : playerView (&_playerView), debugInterface (_debugInterface), result (&_result),
     m_res_pos (_playerView.mapSize - 1, _playerView.mapSize - 1)
@@ -23,6 +57,9 @@ game_step_t::game_step_t (const PlayerView &_playerView, DebugInterface *_debugI
   // hack to avoid const wraper that doesn't work on platform ..
   for (const EntityType tupe : {WALL, HOUSE, BUILDER_BASE, BUILDER_UNIT, MELEE_BASE,  MELEE_UNIT, RANGED_BASE, RANGED_UNIT, RESOURCE, TURRET})
     m_entity[tupe] = std::vector <Entity> ();
+
+  
+  attack_pos = {{playerView->mapSize - 5, 5}, {playerView->mapSize - 5, playerView->mapSize - 5}, {5, playerView->mapSize - 5}};
 
   m_id = playerView->myId;
   for (const auto &player : playerView->players)
@@ -351,24 +388,25 @@ void game_step_t::make_atack_groups (Action &result)
 
   if (rand () % 20 == 0)
     {
-      static std::vector<Vec2Int> pos = {{playerView->mapSize - 5, 5}, {playerView->mapSize - 5, playerView->mapSize - 5}, {5, playerView->mapSize - 5}};
-      int dir = rand () % pos.size ();
+      int dir = choose_atack_pos ();
+      if (dir < 0)
+        return;
       for (const Entity &entity : get_vector (RANGED_UNIT))
         {
           if (rand () % 4 == 0) // 75%
             continue;
-          move_solder (entity, pos[dir], result);
+          move_solder (entity, attack_pos[dir], result);
         }
       for (const Entity &entity : get_vector (MELEE_UNIT))
         {
           if (rand () % 4 == 0) // 75%
             continue;
-          move_solder (entity, pos[dir], result);
+          move_solder (entity, attack_pos[dir], result);
         }
     }
 }
 
-void game_step_t::move_solder (const Entity &entity, const Vec2Int &pos, Action& result)
+void game_step_t::move_solder (const Entity &entity, const Vec2Int &pos, Action& result, bool need_add_task)
 {      
   if (is_busy (entity))
     return;
@@ -380,11 +418,12 @@ void game_step_t::move_solder (const Entity &entity, const Vec2Int &pos, Action&
   std::shared_ptr<AttackAction> atackAction  = std::shared_ptr<AttackAction> (new AttackAction (nullptr, std::shared_ptr<AutoAttack> (new AutoAttack (properties.sightRange, {}))));;
   std::shared_ptr<RepairAction> repairAction = nullptr;
   
-  add_move_task (entity.id, pos);
+  if (need_add_task)
+    add_move_task (entity.id, pos);
   result.entityActions[entity.id] = EntityAction (moveAction, buildAction, atackAction, repairAction);
 }
 
-void game_step_t::run_tasks ()
+void game_step_t::run_tasks (Action& result)
 {
   std::unordered_set<int> finished;
   for (auto &task : game_step_t::repair_tasks)
@@ -425,7 +464,18 @@ void game_step_t::run_tasks ()
       // TO-DO: cancel and go to heal by health
       if (entity.position == pos) // TO-DO: or near it
         {
-          finished.insert (id);
+          int old_dir = get_id_pos_by_vec (pos);
+          destroyed_pos.insert (old_dir);
+
+          int new_dir = choose_atack_pos (pos);
+          if (new_dir == -1)
+            finished.insert (id);
+          else
+            {
+              move_solder (m_entity_by_id[id], attack_pos[new_dir], result, false);
+              task.second = attack_pos[new_dir];
+              make_busy (id);
+            }
           continue;
         }
       make_busy (id);

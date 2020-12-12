@@ -14,7 +14,10 @@ private:
   Action *result;
 
   static std::unordered_map<EntityType, std::vector<Vec2Int>> init_places_for_building ();
-
+  std::vector<Vec2Int> attack_pos;
+  std::unordered_set<int> destroyed_pos;
+  int choose_atack_pos (const Vec2Int old_pos = Vec2Int (-1, -1));
+  int get_id_pos_by_vec (const Vec2Int pos);
 
   const int MIN_BUILDER_UNITS = 6;
 
@@ -67,9 +70,9 @@ public:
   void move_army (const EntityType type, Action& result);
   void turn_on_turrets (Action& result);
   void make_atack_groups (Action &result);
-  void move_solder (const Entity &entity, const Vec2Int &pos, Action& result);
+  void move_solder (const Entity &entity, const Vec2Int &pos, Action& result, bool need_add_task = true);
 
-  void run_tasks ();
+  void run_tasks (Action &result);
   void add_repair_task (const int id, const int id_rep);
   void add_move_task (const int id, const Vec2Int id_rep);
 };
