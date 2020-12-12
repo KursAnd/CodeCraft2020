@@ -7,8 +7,8 @@ std::unordered_map<int, Vec2Int> game_step_t::move_tasks;
 std::unordered_map<EntityType, std::vector<Vec2Int>> game_step_t::init_places_for_building ()
 {
   std::unordered_map<EntityType, std::vector<Vec2Int>> res;
-  res[HOUSE]  = { {0, 0}, {3, 0}, {0, 3}, {6, 0}, {0, 6}, {9, 0}, {0, 9}, {12, 0}, {0, 12}, {15, 0}, {0, 15} };
-  res[TURRET] = { {15, 15}, {20, 6}, {6, 20}, {19, 12}, {12, 19}, {2, 20}, {20, 2} };
+  res[HOUSE]  = { {0, 0}, {3, 0}, {0, 3}, {6, 0}, {0, 6}, {9, 0}, {0, 9}, {12, 0}, {0, 12}, {15, 0}, {0, 15}, {11, 3}, {3, 11}, {11, 6}, {6, 11} };
+  res[TURRET] = { {15, 15}, {20, 7}, {7, 20}, {19, 12}, {12, 19}, {2, 20}, {20, 2}, {20, 5}, {5, 20}, {17, 12}, {12, 17}, {15, 12}, {12, 15} };
   res[BUILDER_BASE] = { {5, 5} };
   res[MELEE_BASE] = { {5, 15} };
   res[RANGED_BASE] = { {15, 5} };
