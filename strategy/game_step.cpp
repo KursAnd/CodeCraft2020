@@ -143,7 +143,7 @@ std::vector<Entity> &game_step_t::get_vector (const EntityType type)
 
 const std::vector<Entity> &game_step_t::get_vector (const EntityType type) const
 {
-  // safe becouse of hack in game_step_t::game_step_t
+  // safe becàuse of hack in game_step_t::game_step_t
   return m_entity.at (type);
 }
 
@@ -188,7 +188,7 @@ void game_step_t::try_build (const EntityType buildType, Action& result)
 
   const Entity *entity = nullptr;
   for (const Entity &_entity : get_vector (BUILDER_UNIT))
-    if (   !ids_was.count (_entity.id)
+    if (   !is_busy (_entity)
         && (!entity || get_distance (pos, _entity, buildType) < get_distance (pos, *entity, buildType)))
       entity = &_entity;
 
