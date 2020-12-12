@@ -35,6 +35,7 @@ private:
   std::unordered_map<EntityType, std::unordered_set<int>> m_entity_set;
   std::unordered_map<EntityType, std::vector<Entity>> m_entity;
   std::unordered_set<int> ids_was;
+  std::vector<std::vector<int>> map;
   
   std::unordered_map<int, int> repair_ids;
   static std::unordered_map<int, int> repair_tasks;

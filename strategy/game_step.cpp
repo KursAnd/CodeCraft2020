@@ -102,6 +102,18 @@ game_step_t::game_step_t (const PlayerView &_playerView, DebugInterface *_debugI
 
   if (m_res_pos.x == _playerView.mapSize - 1 && m_res_pos.y == _playerView.mapSize - 1)
     m_res_pos = Vec2Int (0, 0);
+
+  map = std::vector<std::vector<int>> (playerView->mapSize);
+  for (int i = 0; i < playerView->mapSize; ++i)
+    map[i] = std::vector<int> (playerView->mapSize, -1);
+
+  for (const Entity &entity : playerView->entities)
+    {
+      const EntityProperties &properties = playerView->entityProperties.at (entity.entityType);
+      for (int x = entity.position.x; x < entity.position.x + properties.size; ++x)
+        for (int y = entity.position.y; y < entity.position.y + properties.size; ++y)
+          map[x][y] = entity.entityType;
+    }
 }
 
 Vec2Int game_step_t::get_place_for (const EntityType type) const
