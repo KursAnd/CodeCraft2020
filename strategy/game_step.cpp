@@ -27,7 +27,7 @@ game_step_t::game_step_t (const PlayerView &_playerView, DebugInterface *_debugI
     if (entity.playerId != nullptr && *entity.playerId == m_id)
       {
         m_entity_set[entity.entityType].insert (entity.id);
-        m_entity[entity.entityType].push_back (&entity);
+        m_entity[entity.entityType].push_back (entity);
 
         const EntityProperties &properties = playerView->entityProperties.at (entity.entityType);
         if (entity.active)
@@ -51,8 +51,9 @@ Vec2Int game_step_t::get_place_for (const EntityType type) const
   if (priority[type].size () > get_count (type))
     {
       std::unordered_set<int> exclude;
-      for (const Entity *entity : get_vector (type))
-        exclude.insert (entity->position.x * playerView->mapSize + entity->position.y);
+      if (m_entity.count (type))
+        for (const Entity entity : m_entity.at (type))
+          exclude.insert (entity.position.x * playerView->mapSize + entity.position.y);
 
       for (const Vec2Int &vec2 : priority[type])
         if (!exclude.count (vec2.x * playerView->mapSize + vec2.y))
@@ -122,9 +123,9 @@ bool game_step_t::buy_entity (const EntityType type, const int cnt)
   return true;
 }
 
-void game_step_t::make_busy (const Entity *entity)
+void game_step_t::make_busy (const Entity &entity)
 {
-  ids_was.insert (entity->id);
+  ids_was.insert (entity.id);
 }
 
 Vec2Int game_step_t::get_res_pos () const
@@ -144,29 +145,22 @@ int game_step_t::get_army_count () const
   return get_count (RANGED_UNIT) + get_count (MELEE_UNIT);
 }
 
-const std::vector<const Entity *> &game_step_t::get_vector (const EntityType type) const
+bool game_step_t::is_busy (const Entity &entity) const
 {
-  if (!m_entity.count (type))
-    return std::vector<const Entity *> ();
-  return m_entity.at (type);
+  return ids_was.count (entity.id);
 }
 
-bool game_step_t::is_busy (const Entity *entity) const
+int game_step_t::get_distance (const Entity &ent_a, const Entity &ent_b)
 {
-  return ids_was.count (entity->id);
+  return (ent_a.position.x - ent_b.position.x) * (ent_a.position.x - ent_b.position.x)
+       + (ent_a.position.y - ent_b.position.y) * (ent_a.position.y - ent_b.position.y);
 }
 
-int game_step_t::get_distance (const Entity *ent_a, const Entity *ent_b)
-{
-  return (ent_a->position.x - ent_b->position.x) * (ent_a->position.x - ent_b->position.x)
-       + (ent_a->position.y - ent_b->position.y) * (ent_a->position.y - ent_b->position.y);
-}
-
-int game_step_t::get_distance (const Vec2Int &pos, const Entity *ent_b, const EntityType type) const
+int game_step_t::get_distance (const Vec2Int &pos, const Entity &ent_b, const EntityType type) const
 {
   const int offset = playerView->entityProperties.at (type).size - 1;
-  return (pos.x + offset - ent_b->position.x) * (pos.x + offset - ent_b->position.x)
-       + (pos.y + offset - ent_b->position.y) * (pos.y + offset - ent_b->position.y);
+  return (pos.x + offset - ent_b.position.x) * (pos.x + offset - ent_b.position.x)
+       + (pos.y + offset - ent_b.position.y) * (pos.y + offset - ent_b.position.y);
 }
 
 void game_step_t::try_build (const EntityType buildType, Action& result)
@@ -178,11 +172,14 @@ void game_step_t::try_build (const EntityType buildType, Action& result)
   if (pos.x < 0)
     return;
 
+  if (!m_entity.count (BUILDER_UNIT))
+    return;
+
   const Entity *entity = nullptr;
-  for (const Entity *_entity : get_vector (BUILDER_UNIT))
-    if (   !ids_was.count (_entity->id)
-        && (!entity || get_distance (pos, _entity, buildType) < get_distance (pos, entity, buildType)))
-      entity = _entity;
+  for (const Entity &_entity : m_entity.at (BUILDER_UNIT))
+    if (   !ids_was.count (_entity.id)
+        && (!entity || get_distance (pos, _entity, buildType) < get_distance (pos, *entity, buildType)))
+      entity = &_entity;
 
   if (!entity)
     return;
@@ -203,7 +200,7 @@ void game_step_t::try_build (const EntityType buildType, Action& result)
   else
     moveAction = std::shared_ptr<MoveAction> (new MoveAction (Vec2Int (pos.x + buildProperties.size - 1, pos.y + buildProperties.size - 1), true, true));
 
-  make_busy (entity);
+  make_busy (*entity);
   buy_entity (buildType);
           
   result.entityActions[entity->id] = EntityAction (moveAction, buildAction, atackAction, repairAction);
@@ -211,9 +208,11 @@ void game_step_t::try_build (const EntityType buildType, Action& result)
 
 void game_step_t::train_unit (const EntityType factoryType, Action &result)
 {
-  for (const Entity *entity : get_vector (factoryType))
+  if (!m_entity.count (factoryType))
+    return;
+  for (const Entity &entity : m_entity.at (factoryType))
     {
-      const EntityProperties &properties = playerView->entityProperties.at (entity->entityType);
+      const EntityProperties &properties = playerView->entityProperties.at (entity.entityType);
       EntityType buildType = properties.build->options[0];
 
       std::shared_ptr<MoveAction>   moveAction   = nullptr;
@@ -224,40 +223,42 @@ void game_step_t::train_unit (const EntityType factoryType, Action &result)
       if (need_build (buildType))
         {
           //TO-DO: build in different places + check emptiness
-          buildAction = std::shared_ptr<BuildAction> (new BuildAction (buildType, Vec2Int (entity->position.x + properties.size, entity->position.y + properties.size - 1)));
+          buildAction = std::shared_ptr<BuildAction> (new BuildAction (buildType, Vec2Int (entity.position.x + properties.size, entity.position.y + properties.size - 1)));
 
           make_busy (entity);
           buy_entity (buildType);
         }
 
-      result.entityActions[entity->id] = EntityAction (moveAction, buildAction, atackAction, repairAction);
+      result.entityActions[entity.id] = EntityAction (moveAction, buildAction, atackAction, repairAction);
     }
 }
 
 void game_step_t::check_repair (const EntityType repairType, Action &result)
 {
-  for (const Entity *repair_entity : get_vector (repairType))
+  if (!m_entity.count (repairType) || !m_entity.count (BUILDER_UNIT))
+    return;
+  for (const Entity &repair_entity : m_entity.at (repairType))
     {
-      const EntityProperties &properties = playerView->entityProperties.at (repair_entity->entityType);
+      const EntityProperties &properties = playerView->entityProperties.at (repair_entity.entityType);
 
-      if (repair_entity->health >= properties.maxHealth)
+      if (repair_entity.health >= properties.maxHealth)
         continue;
 
       // TO-DO: let rebuild all workers near building
       const Entity *entity = nullptr;
-      for (const Entity *_entity : get_vector (BUILDER_UNIT))
-        if (!is_busy (_entity) && (!entity || get_distance (repair_entity, _entity) < get_distance (repair_entity, entity)))
-          entity = _entity;
+      for (const Entity _entity : m_entity.at (BUILDER_UNIT))
+        if (!is_busy (_entity) && (!entity || get_distance (repair_entity, _entity) < get_distance (repair_entity, *entity)))
+          entity = &_entity;
 
       if (!entity)
         continue;
 
-      std::shared_ptr<MoveAction>   moveAction   = std::shared_ptr<MoveAction> (new MoveAction (repair_entity->position, true, true));
+      std::shared_ptr<MoveAction>   moveAction   = std::shared_ptr<MoveAction> (new MoveAction (repair_entity.position, true, true));
       std::shared_ptr<BuildAction>  buildAction  = nullptr;
       std::shared_ptr<AttackAction> atackAction  = nullptr;
-      std::shared_ptr<RepairAction> repairAction = std::shared_ptr<RepairAction> (new RepairAction (repair_entity->id));
+      std::shared_ptr<RepairAction> repairAction = std::shared_ptr<RepairAction> (new RepairAction (repair_entity.id));
 
-      make_busy (entity);
+      make_busy (*entity);
       result.entityActions[entity->id] = EntityAction (moveAction, buildAction, atackAction, repairAction);
     }
 }
@@ -266,8 +267,10 @@ void game_step_t::move_builders (Action &result)
 {
   const EntityType type = BUILDER_UNIT;
   const EntityProperties &properties = playerView->entityProperties.at (type);
-  
-  for (const Entity *entity : get_vector (type))
+  if (!m_entity.count (type))
+    return;
+
+  for (const Entity &entity : m_entity.at (type))
     {
       if (is_busy (entity))
         continue;
@@ -277,15 +280,17 @@ void game_step_t::move_builders (Action &result)
       std::shared_ptr<AttackAction> atackAction  = std::shared_ptr<AttackAction> (new AttackAction (nullptr, std::shared_ptr<AutoAttack> (new AutoAttack (properties.sightRange, {RESOURCE}))));
       std::shared_ptr<RepairAction> repairAction = nullptr;
 
-      result.entityActions[entity->id] = EntityAction (moveAction, buildAction, atackAction, repairAction);
+      result.entityActions[entity.id] = EntityAction (moveAction, buildAction, atackAction, repairAction);
     }
 }
 
 void game_step_t::move_army (const EntityType type, Action& result)
 {
   const EntityProperties &properties = playerView->entityProperties.at (type);
-
-  for (const Entity *entity : get_vector (type))
+  if (!m_entity.count (type))
+    return;
+  
+  for (const Entity &entity : m_entity.at (type))
     {
       if (is_busy (entity))
         continue;
@@ -300,7 +305,7 @@ void game_step_t::move_army (const EntityType type, Action& result)
       else
         moveAction = std::shared_ptr<MoveAction> (new MoveAction (Vec2Int (10 + rand () % 14, 10 + rand () % 14), true, false));
 
-      result.entityActions[entity->id] = EntityAction (moveAction, buildAction, atackAction, repairAction);
+      result.entityActions[entity.id] = EntityAction (moveAction, buildAction, atackAction, repairAction);
     }
 }
 
@@ -308,14 +313,16 @@ void game_step_t::turn_on_turrets (Action &result)
 {
   const EntityType type = TURRET;
   const EntityProperties &properties = playerView->entityProperties.at (type);
-  
-  for (const Entity *entity : get_vector (type))
+  if (!m_entity.count (type))
+    return;
+
+  for (const Entity &entity : m_entity.at (type))
     {
       std::shared_ptr<MoveAction>   moveAction   = nullptr;
       std::shared_ptr<BuildAction>  buildAction  = nullptr;
       std::shared_ptr<AttackAction> atackAction  = std::shared_ptr<AttackAction> (new AttackAction (nullptr, std::shared_ptr<AutoAttack> (new AutoAttack (properties.sightRange, {}))));
       std::shared_ptr<RepairAction> repairAction = nullptr;
 
-      result.entityActions[entity->id] = EntityAction (moveAction, buildAction, atackAction, repairAction);
+      result.entityActions[entity.id] = EntityAction (moveAction, buildAction, atackAction, repairAction);
     }
 }
