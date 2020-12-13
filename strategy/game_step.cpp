@@ -428,7 +428,7 @@ void game_step_t::turn_on_turrets (Action &result)
 
 void game_step_t::make_atack_groups (Action &result)
 {
-  if (get_army_count () - game_step_t::attack_move_tasks.size () < 15 || get_count (TURRET) < 2)
+  if (get_army_count () - game_step_t::attack_move_tasks.size () < 12)
     return;
 
   if (true)
