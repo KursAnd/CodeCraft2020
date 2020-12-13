@@ -151,10 +151,10 @@ bool game_step_t::need_build (const EntityType type) const
             && 1.0 * m_population_use / m_population_max > 0.65;
       case WALL        :
         return get_count (BUILDER_UNIT) >= MIN_BUILDER_UNITS
-            && get_count (TURRET) > 3
-            && get_count (WALL) < get_count (TURRET) * 2
-            && 1.0 * m_population_use / m_population_max > 70
-            && m_resource > 50; 
+            && (   get_count (WALL) < 2
+                || (   get_count (TURRET) > 3
+                    && get_count (WALL) < get_count (TURRET) * 2
+                    && 1.0 * m_population_use / m_population_max > 0.7)); 
       default: break;
     }
   return false;
@@ -431,7 +431,7 @@ void game_step_t::make_atack_groups (Action &result)
   if (get_army_count () - game_step_t::attack_move_tasks.size () < 15 || get_count (TURRET) < 2)
     return;
 
-  if (rand () % 20 == 0)
+  if (1.0 * m_population_use / m_population_max > 0.9)
     {
       int dir = choose_atack_pos ();
       if (dir < 0)
@@ -536,7 +536,8 @@ void game_step_t::run_tasks (Action& result)
 void game_step_t::add_repair_task (const int id, const int id_rep)
 {
   // TO-DO: allow to repair by several builders analiticaly
-  if (repair_ids[id_rep] >= 2)
+  int max_rep = std::max (2, get_count (BUILDER_UNIT) / MIN_BUILDER_UNITS + 1);
+  if (repair_ids[id_rep] >= max_rep)
     return;
   game_step_t::repair_tasks[id] = id_rep;
   repair_ids[id_rep]++;
