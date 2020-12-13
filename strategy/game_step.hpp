@@ -19,7 +19,7 @@ private:
   int choose_atack_pos (const Vec2Int old_pos = Vec2Int (-1, -1));
   int get_id_pos_by_vec (const Vec2Int pos);
 
-  const int MIN_BUILDER_UNITS = 6;
+  const int MIN_BUILDER_UNITS = 13;
 
   int m_id = 0;
   int m_resource = 0;
