@@ -438,13 +438,13 @@ void game_step_t::make_atack_groups (Action &result)
         return;
       for (const Entity &entity : get_vector (RANGED_UNIT))
         {
-          if (rand () % 4 == 0 || is_busy (entity)) // 75%
+          if (rand () % 20 == 0 || is_busy (entity)) // 95%
             continue;
           move_solder (entity, attack_pos[dir], result);
         }
       for (const Entity &entity : get_vector (MELEE_UNIT))
         {
-          if (rand () % 4 == 0 || is_busy (entity)) // 75%
+          if (rand () % 20 == 0 || is_busy (entity)) // 95%
             continue;
           move_solder (entity, attack_pos[dir], result);
         }
