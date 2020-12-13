@@ -139,8 +139,8 @@ bool game_step_t::need_build (const EntityType type) const
   switch (type)
     {
       case BUILDER_UNIT: return get_count (BUILDER_UNIT) < std::max (MIN_BUILDER_UNITS, m_population_max * 3 / 10);
-      case RANGED_UNIT : return !need_build (BUILDER_UNIT);
-      case MELEE_UNIT  : return !need_build (BUILDER_UNIT) && get_count (MELEE_UNIT) < get_count (RANGED_UNIT) * 2;
+      case RANGED_UNIT : return get_count (BUILDER_UNIT) >= MIN_BUILDER_UNITS;
+      case MELEE_UNIT  : return get_count (BUILDER_UNIT) >= MIN_BUILDER_UNITS && get_count (MELEE_UNIT) < get_count (RANGED_UNIT) * 2;
 
       case HOUSE       :
         return get_count (BUILDER_UNIT) >= MIN_BUILDER_UNITS
