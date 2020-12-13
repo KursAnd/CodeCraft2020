@@ -140,7 +140,7 @@ bool game_step_t::need_build (const EntityType type) const
     {
       case BUILDER_UNIT: return get_count (BUILDER_UNIT) < std::max (MIN_BUILDER_UNITS, m_population_max * 3 / 10);
       case RANGED_UNIT : return !need_build (BUILDER_UNIT);
-      case MELEE_UNIT  : return !need_build (BUILDER_UNIT) && get_count (MELEE_UNIT) < get_count (RANGED_UNIT) * 2;
+      case MELEE_UNIT  : return !need_build (BUILDER_UNIT);
 
       case HOUSE       :
         return get_count (BUILDER_UNIT) >= MIN_BUILDER_UNITS
@@ -431,7 +431,7 @@ void game_step_t::make_atack_groups (Action &result)
   if (get_army_count () - game_step_t::attack_move_tasks.size () < 15 || get_count (TURRET) < 2)
     return;
 
-  if (1.0 * m_population_use / m_population_max > 0.9)
+  if (true)
     {
       int dir = choose_atack_pos ();
       if (dir < 0)
