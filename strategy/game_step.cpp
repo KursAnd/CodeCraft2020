@@ -296,17 +296,8 @@ bool game_step_t::get_pos_for_safe_operation (const EntityType type, Vec2Int &po
       if (type == BUILDER_BASE || type == MELEE_BASE || type == RANGED_BASE)
         {
           pos = priority_places_for_building.at (type)[0];
-          switch (type)
-            {
-              case BUILDER_BASE:
-                pos.x += properties.size + 1;
-                pos.y += properties.size + 1;
-                break;
-              default:
-                pos.x += properties.size / 2;
-                pos.y += properties.size / 2;
-                break;
-            }
+          pos.x += properties.size / 2 + rand () % properties.size;
+          pos.y += properties.size / 2 + rand () % properties.size;
           attacked = true;
         }
     }
@@ -317,8 +308,8 @@ bool game_step_t::get_pos_for_safe_operation (const EntityType type, Vec2Int &po
           if (entity.active && entity.health < properties.maxHealth)
             {
               pos = entity.position;
-              pos.x += properties.size / 2;
-              pos.y += properties.size / 2;
+              pos.x += properties.size / 2 + rand () % properties.size;
+              pos.y += properties.size / 2 + rand () % properties.size;
               attacked = true;
               break;
             }
