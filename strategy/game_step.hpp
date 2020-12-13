@@ -13,7 +13,7 @@ private:
   DebugInterface *debugInterface;
   Action *result;
 
-  static std::unordered_map<EntityType, std::vector<Vec2Int>> init_places_for_building ();
+  std::unordered_map<EntityType, std::vector<Vec2Int>> priority_places_for_building;
   static std::unordered_set<int> destroyed_pos;
   std::vector<Vec2Int> attack_pos;
   int choose_atack_pos (const Vec2Int old_pos = Vec2Int (-1, -1));
@@ -57,10 +57,12 @@ public:
   const std::vector<Entity> &get_vector (const EntityType type) const;
   bool is_busy (const Entity &entity) const;
   bool is_empty_space_for_type (const Vec2Int pos, const EntityType type) const;
-  
+  bool is_first_building_attaked (const EntityType type) const;
+
   static bool is_near (const Vec2Int &pos_a, const Vec2Int &pos_b, const int dist = 0);
   static int get_distance (const Entity &ent_a, const Entity &ent_b);
   int get_distance (const Vec2Int &pos, const Entity &ent_b, const EntityType type) const;
+  bool get_pos_for_safe_operation (const EntityType type, Vec2Int &pos) const;
   
 
   bool buy_entity (const EntityType type, const int cnt = 1);

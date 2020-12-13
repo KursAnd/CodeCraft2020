@@ -3,19 +3,6 @@
 
 std::unordered_map<int, int> game_step_t::repair_tasks;
 std::unordered_map<int, Vec2Int> game_step_t::attack_move_tasks;
-
-std::unordered_map<EntityType, std::vector<Vec2Int>> game_step_t::init_places_for_building ()
-{
-  std::unordered_map<EntityType, std::vector<Vec2Int>> res;
-  res[HOUSE]  = { {0, 0}, {4, 0}, {0, 4}, {7, 0}, {0, 7}, {10, 0}, {0, 10}, {13, 0}, {0, 13}, {11, 3}, {3, 11}, {16, 0}, {0, 16}, {11, 6}, {6, 11}, {13, 11}, {10, 11} };
-  res[TURRET] = { {15, 15}, {20, 7}, {7, 20}, {5, 20}, {20, 5}, {16, 13}, {13, 16}, {2, 20}, {20, 2}, {17, 11}, {11, 17}, {11, 19}, {19, 11}, {20, 0}, {0, 20} };
-  res[BUILDER_BASE] = { {5, 5} };
-  res[MELEE_BASE] = { {5, 15} };
-  res[RANGED_BASE] = { {15, 5} };
-  res[WALL] = { {22, 7}, {22, 8}, {7, 22}, {8, 22}, {22, 6}, {6, 22}, {22, 9}, {9, 22}, {22, 5}, {5, 22}, {22, 4}, {4, 22}, {21, 9}, {9, 21}, {17, 15}, {15, 17}, {17, 16}, {16, 17},
-    {18, 13}, {13, 18}, {18, 14}, {14, 18}, {19, 13}, {13, 19}, {20, 13}, {13, 20}, {21, 12}, {12, 21}, {21, 11}, {11, 21}, {22, 3}, {3, 22}, {22, 2}, {2, 22}, {22, 1}, {1, 22}, {22, 0}, {0, 22}};
-  return res;
-}
 std::unordered_set<int> game_step_t::destroyed_pos;
 
 int game_step_t::choose_atack_pos (const Vec2Int old_pos)
@@ -74,6 +61,26 @@ game_step_t::game_step_t (const PlayerView &_playerView, DebugInterface *_debugI
   
   attack_pos = {{playerView->mapSize - 5, 5}, {playerView->mapSize - 5, playerView->mapSize - 5}, {5, playerView->mapSize - 5}};
 
+  {
+    std::unordered_map<EntityType, std::vector<Vec2Int>> &res = priority_places_for_building;
+    res[HOUSE]  = { {0, 0}, {4, 0}, {0, 4}, {7, 0}, {0, 7}, {10, 0}, {0, 10}, {13, 0}, {0, 13}, {11, 3}, {3, 11}, {16, 0}, {0, 16}, {11, 6}, {6, 11}, {13, 11}, {10, 11} };
+    res[TURRET] = { {15, 15}, {20, 7}, {7, 20}, {5, 20}, {20, 5}, {16, 13}, {13, 16}, {2, 20}, {20, 2}, {17, 11}, {11, 17}, {11, 19}, {19, 11}, {20, 0}, {0, 20} };
+    res[BUILDER_BASE] = { {5, 5} };
+    res[MELEE_BASE] = { {5, 15} };
+    res[RANGED_BASE] = { {15, 5} };
+    res[WALL] = { {22, 7}, {22, 8}, {7, 22}, {8, 22}, {22, 6}, {6, 22}, {22, 9}, {9, 22}, {22, 5}, {5, 22}, {22, 4}, {4, 22}, {21, 9}, {9, 21}, {17, 15}, {15, 17}, {17, 16}, {16, 17},
+      {18, 13}, {13, 18}, {18, 14}, {14, 18}, {19, 13}, {13, 19}, {20, 13}, {13, 20}, {21, 12}, {12, 21}, {21, 11}, {11, 21}, {22, 3}, {3, 22}, {22, 2}, {2, 22}, {22, 1}, {1, 22}, {22, 0}, {0, 22}};
+
+    // for safety in .at ()
+    res[BUILDER_UNIT] = {};
+    res[MELEE_UNIT] = {};
+    res[RANGED_UNIT] = {};
+    res[RESOURCE] = {};
+  }
+
+
+
+
   m_id = playerView->myId;
   for (const auto &player : playerView->players)
     if (player.id == m_id)
@@ -119,11 +126,9 @@ game_step_t::game_step_t (const PlayerView &_playerView, DebugInterface *_debugI
 
 Vec2Int game_step_t::get_place_for (const EntityType type) const
 {
-  static std::unordered_map <EntityType, std::vector<Vec2Int>> priority = init_places_for_building ();
-
-  if (priority[type].size () > get_count (type))
+  if (priority_places_for_building.at (type).size () > get_count (type))
     {
-      for (const Vec2Int &vec2 : priority[type])
+      for (const Vec2Int &vec2 : priority_places_for_building.at (type))
         {
           if (is_empty_space_for_type (vec2, type))
             return vec2;
@@ -138,7 +143,7 @@ bool game_step_t::need_build (const EntityType type) const
     return false;
   switch (type)
     {
-      case BUILDER_UNIT: return get_count (BUILDER_UNIT) < std::max (MIN_BUILDER_UNITS, m_population_max * 3 / 10);
+      case BUILDER_UNIT: return get_count (BUILDER_UNIT) < std::max (MIN_BUILDER_UNITS, m_population_max * 4 / 10);
       case RANGED_UNIT : return get_count (BUILDER_UNIT) >= MIN_BUILDER_UNITS;
       case MELEE_UNIT  : return get_count (BUILDER_UNIT) >= MIN_BUILDER_UNITS && get_count (MELEE_UNIT) < get_count (RANGED_UNIT) * 2;
 
@@ -253,6 +258,17 @@ bool game_step_t::is_empty_space_for_type (const Vec2Int pos, const EntityType t
   return true;
 }
 
+bool game_step_t::is_first_building_attaked (const EntityType type) const
+{
+  if (get_count (type) == 0)
+    return true;
+  const EntityProperties &properties = playerView->entityProperties.at (type);
+  const Entity &entity = m_entity.at (type)[0];
+  if (entity.active && entity.health < properties.maxHealth)
+    return true;
+  return false;
+}
+
 bool game_step_t::is_near (const Vec2Int &pos_a, const Vec2Int &pos_b, const int dist)
 {
   return std::abs (pos_a.x - pos_b.x) < dist && std::abs (pos_a.y - pos_b.y) < dist;
@@ -269,6 +285,46 @@ int game_step_t::get_distance (const Vec2Int &pos, const Entity &ent_b, const En
   const int offset = playerView->entityProperties.at (type).size - 1;
   return (pos.x + offset - ent_b.position.x) * (pos.x + offset - ent_b.position.x)
        + (pos.y + offset - ent_b.position.y) * (pos.y + offset - ent_b.position.y);
+}
+
+bool game_step_t::get_pos_for_safe_operation (const EntityType type, Vec2Int &pos) const
+{
+  bool attacked = false;
+  const EntityProperties &properties = playerView->entityProperties.at (type);
+  if (get_count (type) == 0)
+    {
+      if (type == BUILDER_BASE || type == MELEE_BASE || type == RANGED_BASE)
+        {
+          pos = priority_places_for_building.at (type)[0];
+          switch (type)
+            {
+              case BUILDER_BASE:
+                pos.x += properties.size + 1;
+                pos.y += properties.size + 1;
+                break;
+              default:
+                pos.x += properties.size / 2;
+                pos.y += properties.size / 2;
+                break;
+            }
+          attacked = true;
+        }
+    }
+  else
+    {
+      for (const Entity &entity : get_vector (type))
+        {
+          if (entity.active && entity.health < properties.maxHealth)
+            {
+              pos = entity.position;
+              pos.x += properties.size / 2;
+              pos.y += properties.size / 2;
+              attacked = true;
+              break;
+            }
+        }
+    }
+  return attacked;
 }
 
 void game_step_t::try_build (const EntityType buildType, Action& result)
@@ -399,12 +455,23 @@ void game_step_t::move_army (const EntityType type, Action& result)
       std::shared_ptr<AttackAction> atackAction  = std::shared_ptr<AttackAction> (new AttackAction (nullptr, std::shared_ptr<AutoAttack> (new AutoAttack (properties.sightRange, {}))));;
       std::shared_ptr<RepairAction> repairAction = nullptr;
 
-      if (entity.id % 4 < 2)
-        moveAction = std::shared_ptr<MoveAction> (new MoveAction (Vec2Int (10 + rand () % 13, 10 + rand () % 13), true, false));
-      else if (entity.id % 4 == 2)
-        moveAction = std::shared_ptr<MoveAction> (new MoveAction (Vec2Int (20 + rand () % 4, 3 + rand () % 12), true, false));
+      Vec2Int pos;
+      if (   get_pos_for_safe_operation (BUILDER_BASE, pos)
+          || get_pos_for_safe_operation (RANGED_BASE , pos)
+          || get_pos_for_safe_operation (MELEE_BASE  , pos)
+          || get_pos_for_safe_operation (TURRET      , pos)
+          || get_pos_for_safe_operation (HOUSE       , pos)
+          || get_pos_for_safe_operation (WALL        , pos))
+        moveAction = std::shared_ptr<MoveAction> (new MoveAction (pos, true, false));
       else
-        moveAction = std::shared_ptr<MoveAction> (new MoveAction (Vec2Int (3 + rand () % 12, 20 + rand () % 4), true, false));
+        {
+          if (entity.id % 4 < 2)
+            moveAction = std::shared_ptr<MoveAction> (new MoveAction (Vec2Int (10 + rand () % 13, 10 + rand () % 13), true, false));
+          else if (entity.id % 4 == 2)
+            moveAction = std::shared_ptr<MoveAction> (new MoveAction (Vec2Int (20 + rand () % 4, 3 + rand () % 12), true, false));
+          else
+            moveAction = std::shared_ptr<MoveAction> (new MoveAction (Vec2Int (3 + rand () % 12, 20 + rand () % 4), true, false));
+        }
 
       result.entityActions[entity.id] = EntityAction (moveAction, buildAction, atackAction, repairAction);
     }
