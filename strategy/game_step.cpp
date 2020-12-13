@@ -428,10 +428,7 @@ void game_step_t::turn_on_turrets (Action &result)
 
 void game_step_t::make_atack_groups (Action &result)
 {
-  if (get_army_count () - game_step_t::attack_move_tasks.size () < 12 || (!game_step_t::destroyed_pos.empty () && get_count (TURRET) >= 3))
-    return;
-
-  if (true)
+  if (get_army_count () - game_step_t::attack_move_tasks.size () > 12 || (!game_step_t::destroyed_pos.empty () && get_count (TURRET) >= 3))
     {
       int dir = choose_atack_pos ();
       if (dir < 0)
