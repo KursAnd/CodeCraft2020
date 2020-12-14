@@ -4,6 +4,7 @@
 std::unordered_map<int, int> game_step_t::repair_tasks;
 std::unordered_map<int, Vec2Int> game_step_t::attack_move_tasks;
 std::unordered_set<int> game_step_t::destroyed_pos;
+int game_step_t::cleaner_lv = 0;
 
 int game_step_t::choose_atack_pos (const Vec2Int old_pos)
 {
@@ -77,6 +78,19 @@ game_step_t::game_step_t (const PlayerView &_playerView, Action &_result)
   {
     attack_pos = {{playerView->mapSize - 5, 5}, {playerView->mapSize - 5, playerView->mapSize - 5}, {5, playerView->mapSize - 5}};
   }
+  {
+    cleaner_aims = {
+        {BUILDER_BASE, 0},
+                                  {HOUSE, 0}, {HOUSE, 1}, {HOUSE, 2}, {HOUSE, 3}, {HOUSE, 4},
+        {RANGED_BASE, 0},
+        {MELEE_BASE, 0},
+        {TURRET, 0}, {TURRET, 1},
+                                  {HOUSE, 5}, {HOUSE, 6}, {HOUSE, 7}, {HOUSE, 8}, {HOUSE, 9},
+        {TURRET, 2}, {TURRET, 3},
+                                  {HOUSE, 10}, {HOUSE, 11}, {HOUSE, 16},
+        {TURRET, 4}, {TURRET, 5}, {TURRET, 6}, {TURRET, 14}
+    };
+  }
 
   m_id = playerView->myId;
   for (const auto &player : playerView->players)
@@ -109,15 +123,21 @@ game_step_t::game_step_t (const PlayerView &_playerView, Action &_result)
     m_res_pos = Vec2Int (0, 0);
 
   map = std::vector<std::vector<int>> (playerView->mapSize);
+  map_id = std::vector<std::vector<int>> (playerView->mapSize);
   for (int i = 0; i < playerView->mapSize; ++i)
-    map[i] = std::vector<int> (playerView->mapSize, 0);
-
+    {
+      map[i] = std::vector<int> (playerView->mapSize, 0);
+      map_id[i] = std::vector<int> (playerView->mapSize, -1);
+    }
   for (const Entity &entity : playerView->entities)
     {
       const EntityProperties &properties = playerView->entityProperties.at (entity.entityType);
       for (int x = entity.position.x; x < entity.position.x + properties.size; ++x)
         for (int y = entity.position.y; y < entity.position.y + properties.size; ++y)
-          map[x][y] = entity.entityType + 1;
+          {
+            map[x][y] = entity.entityType + 1;
+            map_id[x][y] = entity.id;
+          }
     }
 }
 
@@ -308,6 +328,30 @@ int game_step_t::get_max_distance () const
 int game_step_t::get_distance (const Vec2Int pos_a, const Vec2Int pos_b)
 {
   return std::abs (pos_a.x - pos_b.x) + std::abs (pos_a.y - pos_b.y);
+}
+
+Vec2Int game_step_t::get_cleaner_aim () const
+{
+  if (game_step_t::cleaner_lv >= game_step_t::cleaner_aims.size ())
+    return Vec2Int (-1, -1);
+  while (game_step_t::cleaner_lv < game_step_t::cleaner_aims.size ())
+    {
+      const EntityType type = game_step_t::cleaner_aims.at (game_step_t::cleaner_lv).first;
+      const int lv          = game_step_t::cleaner_aims.at (game_step_t::cleaner_lv).second;
+      const Vec2Int pos = priority_places_for_building.at (type).at (lv);
+      const EntityProperties &properties = playerView->entityProperties.at (type);
+      if (!is_place_contain (pos.x, pos.y, type))
+        {
+          for (int x = pos.x; x < pos.x + properties.size; ++x)
+            for (int y = pos.y; y < pos.y + properties.size; ++y)
+              {
+                if (is_place_contain (x, y, RESOURCE))
+                  return Vec2Int (x, y);
+              }
+        }
+      game_step_t::cleaner_lv++;      
+    }
+  return Vec2Int (-1, -1);
 }
 
 int game_step_t::get_distance_for_base (const Vec2Int pos_a, const Vec2Int &pos_b, const EntityType type_b, Vec2Int &best_pos) const
@@ -617,6 +661,31 @@ void game_step_t::move_solder (const Entity &entity, const Vec2Int &pos, bool ne
   else
     make_busy (entity.id);
   result->entityActions[entity.id] = EntityAction (moveAction, buildAction, atackAction, repairAction);
+}
+
+void game_step_t::send_cleaner ()
+{
+  const Vec2Int pos = get_cleaner_aim ();
+  if (pos.x < 0)
+    return;
+
+  const EntityType type = BUILDER_UNIT;
+  const EntityProperties &properties = playerView->entityProperties.at (type);
+
+  for (const Entity &entity : get_vector (type))
+    {
+      if (is_busy (entity))
+        continue;
+
+      std::shared_ptr<MoveAction>   moveAction   = std::shared_ptr<MoveAction> (new MoveAction (pos, false, true));
+      std::shared_ptr<BuildAction>  buildAction  = nullptr;
+      std::shared_ptr<AttackAction> atackAction  = std::shared_ptr<AttackAction> (new AttackAction (std::shared_ptr<int> (new int (map_id[pos.x][pos.y])), nullptr));
+      std::shared_ptr<RepairAction> repairAction = nullptr;
+
+      make_busy (entity.id);
+      result->entityActions[entity.id] = EntityAction (moveAction, buildAction, atackAction, repairAction);
+      break;
+    }
 }
 
 void game_step_t::run_tasks ()

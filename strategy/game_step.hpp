@@ -19,6 +19,9 @@ private:
   int choose_atack_pos (const Vec2Int old_pos = Vec2Int (-1, -1));
   int get_id_pos_by_vec (const Vec2Int pos);
 
+  static int cleaner_lv;
+  std::vector<std::pair<EntityType, int>> cleaner_aims;
+
   const int MIN_BUILDER_UNITS = 13;
 
   int m_id = 0;
@@ -35,6 +38,7 @@ private:
   std::unordered_map<EntityType, std::vector<Entity>> m_entity;
   std::unordered_set<int> ids_was;
   std::vector<std::vector<int>> map;
+  std::vector<std::vector<int>> map_id;
   
   std::unordered_map<int, int> repair_ids;
   static std::unordered_map<int, int> repair_tasks;
@@ -62,6 +66,7 @@ public:
   bool is_place_free (const int x, const int y) const;
   bool is_place_contain (const int x, const int y, const EntityType type) const;
 
+  Vec2Int get_cleaner_aim () const;
   int get_max_distance () const;
   static int get_distance (const Vec2Int pos_a, const Vec2Int pos_b);
   int get_distance_for_base (const Vec2Int pos_a, const Vec2Int &pos_b, const EntityType type_b, Vec2Int &best_pos) const;
@@ -83,6 +88,7 @@ public:
   void turn_on_turrets ();
   void make_atack_groups ();
   void move_solder (const Entity &entity, const Vec2Int &pos, bool need_add_task = true);
+  void send_cleaner ();
 
   void run_tasks ();
   void add_repair_task (const int id, const int id_rep);
