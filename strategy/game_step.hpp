@@ -28,7 +28,6 @@ private:
   int m_population_use = 0;
 
   Vec2Int m_res_pos;  // purpouse for BUILDERs who collect thr resources
-  bool collect_money = false;
 
   std::unordered_map<int, EntityType> m_entity_type_by_id;
   std::unordered_map<int, Entity> m_entity_by_id;
@@ -47,11 +46,11 @@ public:
 
   Vec2Int get_place_for (const EntityType type) const;
   bool need_build (const EntityType type) const;
-  void check_have_build (const EntityType type);
   int entity_price (const EntityType type, const int cnt = 1) const;
 
   int get_count (const EntityType type) const;
   int get_army_count () const;
+  int get_base_count () const;
   Vec2Int get_res_pos () const;
   std::vector<Entity> &get_vector (const EntityType type);
   const std::vector<Entity> &get_vector (const EntityType type) const;

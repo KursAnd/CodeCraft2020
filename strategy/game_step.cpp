@@ -151,14 +151,14 @@ bool game_step_t::need_build (const EntityType type) const
         return get_count (BUILDER_UNIT) >= MIN_BUILDER_UNITS
             && get_count (BUILDER_UNIT) > get_count (TURRET)
             && 1.0 * m_population_use / m_population_max > 0.65
-            && !collect_money;
+            && get_count (BUILDER_UNIT) > 0;
       case WALL        :
         return get_count (BUILDER_UNIT) >= MIN_BUILDER_UNITS
             && (   get_count (WALL) < 2
                 || (   get_count (TURRET) > 3
                     && get_count (WALL) < get_count (TURRET) * 2
                     && 1.0 * m_population_use / m_population_max > 0.7))
-            && !collect_money;
+            && get_base_count () >= 2;
 
       case BUILDER_BASE:
       case RANGED_BASE :
@@ -167,19 +167,6 @@ bool game_step_t::need_build (const EntityType type) const
       default: break;
     }
   return false;
-}
-
-void game_step_t::check_have_build (const EntityType type)
-{
-  switch (type)
-    {
-      case BUILDER_BASE:
-      case RANGED_BASE :
-      case MELEE_BASE  :
-        if (get_count (type) < 1)
-          collect_money = true;
-      default: break;
-    }
 }
 
 int game_step_t::entity_price (const EntityType type, const int cnt) const
@@ -243,6 +230,11 @@ int game_step_t::get_count (const EntityType type) const
 int game_step_t::get_army_count () const
 {
   return get_count (RANGED_UNIT) + get_count (MELEE_UNIT);
+}
+
+int game_step_t::get_base_count () const
+{
+  return get_count (BUILDER_BASE) + get_count (RANGED_BASE) + get_count (MELEE_BASE);
 }
 
 bool game_step_t::is_busy (const Entity &entity) const
@@ -343,7 +335,7 @@ int game_step_t::count_workers_to_repair (const EntityType type) const
 void game_step_t::try_build (const EntityType buildType)
 {
   if (!need_build (buildType))
-    return check_have_build (buildType);
+    return;
 
   Vec2Int pos = get_place_for (buildType);
   if (pos.x < 0)
