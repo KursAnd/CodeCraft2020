@@ -10,33 +10,33 @@ void strategy_1 (const PlayerView& playerView, DebugInterface* debugInterface, A
       srand(time(NULL));
     }
 
-  game_step_t gs (playerView, debugInterface, result);
+  game_step_t gs (playerView, result);
 
-  gs.run_tasks (result);
+  gs.run_tasks ();
 
-  gs.check_repair (BUILDER_BASE, result);
-  gs.check_repair (MELEE_BASE  , result);
-  gs.check_repair (RANGED_BASE , result);
-  gs.check_repair (TURRET      , result);
-  gs.check_repair (HOUSE       , result);
-  gs.check_repair (WALL        , result);
+  gs.check_repair (BUILDER_BASE);
+  gs.check_repair (MELEE_BASE);
+  gs.check_repair (RANGED_BASE);
+  gs.check_repair (TURRET);
+  gs.check_repair (HOUSE);
+  gs.check_repair (WALL);
   
-  gs.train_unit (BUILDER_BASE, result);
-  gs.train_unit (RANGED_BASE , result);
-  gs.train_unit (MELEE_BASE  , result);
+  gs.train_unit (BUILDER_BASE);
+  gs.train_unit (RANGED_BASE);
+  gs.train_unit (MELEE_BASE);
   
-  gs.try_build (BUILDER_BASE, result);
-  gs.try_build (MELEE_BASE  , result);
-  gs.try_build (RANGED_BASE , result);
-  gs.try_build (HOUSE       , result);
-  gs.try_build (TURRET      , result);
-  gs.try_build (WALL        , result);
+  gs.try_build (BUILDER_BASE);
+  gs.try_build (MELEE_BASE);
+  gs.try_build (RANGED_BASE);
+  gs.try_build (HOUSE);
+  gs.try_build (TURRET);
+  gs.try_build (WALL);
   
-  gs.make_atack_groups (result);
+  gs.make_atack_groups ();
   
-  gs.move_builders (result);
-  gs.move_army (RANGED_UNIT, result);
-  gs.move_army (MELEE_UNIT , result);
+  gs.move_builders ();
+  gs.move_army (RANGED_UNIT);
+  gs.move_army (MELEE_UNIT);
 
-  gs.turn_on_turrets (result);
+  gs.turn_on_turrets ();
 }

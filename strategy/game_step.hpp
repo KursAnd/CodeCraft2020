@@ -10,7 +10,6 @@ class game_step_t
 {
 private:
   const PlayerView *playerView;
-  DebugInterface *debugInterface;
   Action *result;
 
   std::unordered_map<EntityType, std::vector<Vec2Int>> priority_places_for_building;
@@ -42,7 +41,7 @@ private:
   static std::unordered_map<int, Vec2Int> attack_move_tasks;
 
 public:
-  game_step_t (const PlayerView &_playerView, DebugInterface *_debugInterface, Action &_result);
+  game_step_t (const PlayerView &_playerView, Action &_result);
 
 
   Vec2Int get_place_for (const EntityType type) const;
@@ -68,17 +67,17 @@ public:
   bool buy_entity (const EntityType type, const int cnt = 1);
   void make_busy (const Entity &entity);
   void make_busy (const int id);
-  void try_build      (const EntityType buildType, Action& result);
-  void train_unit (const EntityType factoryType, Action& result);
-  void check_repair   (const EntityType repairType, Action& result);
-  void move_builders (Action& result);
-  void move_army (const EntityType type, Action& result);
-  void turn_on_turrets (Action& result);
-  void make_atack_groups (Action &result);
-  void move_solder (const Entity &entity, const Vec2Int &pos, Action& result, bool need_add_task = true);
+  void try_build (const EntityType buildType);
+  void train_unit (const EntityType factoryType);
+  void check_repair (const EntityType repairType);
+  void move_builders ();
+  void move_army (const EntityType type);
+  void turn_on_turrets ();
+  void make_atack_groups ();
+  void move_solder (const Entity &entity, const Vec2Int &pos, bool need_add_task = true);
 
-  void run_tasks (Action &result);
+  void run_tasks ();
   void add_repair_task (const int id, const int id_rep);
   void add_move_task (const int id, const Vec2Int id_rep);
-  void redirect_all_atack_move_tasks (const Vec2Int old_pos, const Vec2Int new_pos, Action &result);
+  void redirect_all_atack_move_tasks (const Vec2Int old_pos, const Vec2Int new_pos);
 };

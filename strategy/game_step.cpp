@@ -50,8 +50,8 @@ int game_step_t::get_id_pos_by_vec (const Vec2Int pos)
   return dir;
 }
 
-game_step_t::game_step_t (const PlayerView &_playerView, DebugInterface *_debugInterface, Action &_result)
-  : playerView (&_playerView), debugInterface (_debugInterface), result (&_result),
+game_step_t::game_step_t (const PlayerView &_playerView, Action &_result)
+  : playerView (&_playerView), result (&_result),
     m_res_pos (_playerView.mapSize - 1, _playerView.mapSize - 1)
 {
   // hack to avoid const wraper that doesn't work on platform ..
@@ -318,7 +318,7 @@ bool game_step_t::get_pos_for_safe_operation (const EntityType type, Vec2Int &po
   return attacked;
 }
 
-void game_step_t::try_build (const EntityType buildType, Action& result)
+void game_step_t::try_build (const EntityType buildType)
 {
   if (!need_build (buildType))
     return check_have_build (buildType);
@@ -356,10 +356,10 @@ void game_step_t::try_build (const EntityType buildType, Action& result)
   make_busy (*entity);
   buy_entity (buildType);
           
-  result.entityActions[entity->id] = EntityAction (moveAction, buildAction, atackAction, repairAction);
+  result->entityActions[entity->id] = EntityAction (moveAction, buildAction, atackAction, repairAction);
 }
 
-void game_step_t::train_unit (const EntityType factoryType, Action &result)
+void game_step_t::train_unit (const EntityType factoryType)
 {
   for (const Entity &entity : get_vector (factoryType))
     {
@@ -380,11 +380,11 @@ void game_step_t::train_unit (const EntityType factoryType, Action &result)
           buy_entity (buildType);
         }
 
-      result.entityActions[entity.id] = EntityAction (moveAction, buildAction, atackAction, repairAction);
+      result->entityActions[entity.id] = EntityAction (moveAction, buildAction, atackAction, repairAction);
     }
 }
 
-void game_step_t::check_repair (const EntityType repairType, Action &result)
+void game_step_t::check_repair (const EntityType repairType)
 {
   for (const Entity &repair_entity : get_vector (repairType))
     {
@@ -409,11 +409,11 @@ void game_step_t::check_repair (const EntityType repairType, Action &result)
       std::shared_ptr<RepairAction> repairAction = std::shared_ptr<RepairAction> (new RepairAction (repair_entity.id));
 
       add_repair_task (entity->id, repair_entity.id);
-      result.entityActions[entity->id] = EntityAction (moveAction, buildAction, atackAction, repairAction);
+      result->entityActions[entity->id] = EntityAction (moveAction, buildAction, atackAction, repairAction);
     }
 }
 
-void game_step_t::move_builders (Action &result)
+void game_step_t::move_builders ()
 {
   const EntityType type = BUILDER_UNIT;
   const EntityProperties &properties = playerView->entityProperties.at (type);
@@ -428,11 +428,11 @@ void game_step_t::move_builders (Action &result)
       std::shared_ptr<AttackAction> atackAction  = std::shared_ptr<AttackAction> (new AttackAction (nullptr, std::shared_ptr<AutoAttack> (new AutoAttack (properties.sightRange, {RESOURCE}))));
       std::shared_ptr<RepairAction> repairAction = nullptr;
 
-      result.entityActions[entity.id] = EntityAction (moveAction, buildAction, atackAction, repairAction);
+      result->entityActions[entity.id] = EntityAction (moveAction, buildAction, atackAction, repairAction);
     }
 }
 
-void game_step_t::move_army (const EntityType type, Action& result)
+void game_step_t::move_army (const EntityType type)
 {
   const EntityProperties &properties = playerView->entityProperties.at (type);
   
@@ -464,11 +464,11 @@ void game_step_t::move_army (const EntityType type, Action& result)
             moveAction = std::shared_ptr<MoveAction> (new MoveAction (Vec2Int (3 + rand () % 12, 20 + rand () % 4), true, false));
         }
 
-      result.entityActions[entity.id] = EntityAction (moveAction, buildAction, atackAction, repairAction);
+      result->entityActions[entity.id] = EntityAction (moveAction, buildAction, atackAction, repairAction);
     }
 }
 
-void game_step_t::turn_on_turrets (Action &result)
+void game_step_t::turn_on_turrets ()
 {
   const EntityType type = TURRET;
   const EntityProperties &properties = playerView->entityProperties.at (type);
@@ -480,11 +480,11 @@ void game_step_t::turn_on_turrets (Action &result)
       std::shared_ptr<AttackAction> atackAction  = std::shared_ptr<AttackAction> (new AttackAction (nullptr, std::shared_ptr<AutoAttack> (new AutoAttack (properties.sightRange, {}))));
       std::shared_ptr<RepairAction> repairAction = nullptr;
 
-      result.entityActions[entity.id] = EntityAction (moveAction, buildAction, atackAction, repairAction);
+      result->entityActions[entity.id] = EntityAction (moveAction, buildAction, atackAction, repairAction);
     }
 }
 
-void game_step_t::make_atack_groups (Action &result)
+void game_step_t::make_atack_groups ()
 {
   if (get_army_count () - game_step_t::attack_move_tasks.size () > 12 || (!game_step_t::destroyed_pos.empty () && get_count (TURRET) >= 3))
     {
@@ -495,18 +495,18 @@ void game_step_t::make_atack_groups (Action &result)
         {
           if (rand () % 20 == 0 || is_busy (entity)) // 95%
             continue;
-          move_solder (entity, attack_pos[dir], result);
+          move_solder (entity, attack_pos[dir]);
         }
       for (const Entity &entity : get_vector (MELEE_UNIT))
         {
           if (rand () % 20 == 0 || is_busy (entity)) // 95%
             continue;
-          move_solder (entity, attack_pos[dir], result);
+          move_solder (entity, attack_pos[dir]);
         }
     }
 }
 
-void game_step_t::move_solder (const Entity &entity, const Vec2Int &pos, Action& result, bool need_add_task)
+void game_step_t::move_solder (const Entity &entity, const Vec2Int &pos, bool need_add_task)
 {
   const EntityProperties &properties = playerView->entityProperties.at (entity.entityType);
 
@@ -519,10 +519,10 @@ void game_step_t::move_solder (const Entity &entity, const Vec2Int &pos, Action&
     add_move_task (entity.id, pos);
   else
     make_busy (entity.id);
-  result.entityActions[entity.id] = EntityAction (moveAction, buildAction, atackAction, repairAction);
+  result->entityActions[entity.id] = EntityAction (moveAction, buildAction, atackAction, repairAction);
 }
 
-void game_step_t::run_tasks (Action& result)
+void game_step_t::run_tasks ()
 {
   std::unordered_set<int> finished;
   for (auto &task : game_step_t::repair_tasks)
@@ -584,7 +584,7 @@ void game_step_t::run_tasks (Action& result)
   for (const int id : finished)
     game_step_t::attack_move_tasks.erase (id);
   if (need_redirect)
-    redirect_all_atack_move_tasks (vec_old, vec_new, result);
+    redirect_all_atack_move_tasks (vec_old, vec_new);
 }
 
 
@@ -605,7 +605,7 @@ void game_step_t::add_move_task (const int id, const Vec2Int pos)
   make_busy (id);
 }
 
-void game_step_t::redirect_all_atack_move_tasks (const Vec2Int old_pos, const Vec2Int new_pos, Action &result)
+void game_step_t::redirect_all_atack_move_tasks (const Vec2Int old_pos, const Vec2Int new_pos)
 {
   for (auto &task : game_step_t::attack_move_tasks)
     {
@@ -613,7 +613,7 @@ void game_step_t::redirect_all_atack_move_tasks (const Vec2Int old_pos, const Ve
       const Vec2Int pos = task.second;
       if (pos == old_pos)
         {
-          move_solder (m_entity_by_id[id], new_pos, result, false);
+          move_solder (m_entity_by_id[id], new_pos, false);
           task.second = new_pos;
         }
     }
