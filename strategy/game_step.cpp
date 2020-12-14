@@ -168,7 +168,7 @@ bool game_step_t::need_build (const EntityType type) const
 
       case HOUSE       :
         return (get_count (BUILDER_UNIT) >= MIN_BUILDER_UNITS || m_population_use < MIN_BUILDER_UNITS)
-            && m_population_use + 5 >= m_population_max_future;
+            && m_population_use + 10 >= m_population_max_future;
       case TURRET      :
         return get_count (BUILDER_UNIT) >= MIN_BUILDER_UNITS
             && m_population_max >= 30
