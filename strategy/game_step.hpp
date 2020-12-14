@@ -46,6 +46,7 @@ public:
 
   Vec2Int get_place_for (const EntityType type) const;
   bool need_build (const EntityType type) const;
+  bool can_build (const EntityType type) const;
   int entity_price (const EntityType type, const int cnt = 1) const;
 
   int get_count (const EntityType type) const;

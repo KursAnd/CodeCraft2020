@@ -142,7 +142,9 @@ bool game_step_t::need_build (const EntityType type) const
     {
       case BUILDER_UNIT: return get_count (BUILDER_UNIT) < std::max (MIN_BUILDER_UNITS, m_population_max * 4 / 10);
       case RANGED_UNIT : return get_count (BUILDER_UNIT) >= MIN_BUILDER_UNITS;
-      case MELEE_UNIT  : return get_count (BUILDER_UNIT) >= MIN_BUILDER_UNITS && get_count (MELEE_UNIT) < get_count (RANGED_UNIT) * 2;
+      case MELEE_UNIT  : return get_count (BUILDER_UNIT) >= MIN_BUILDER_UNITS
+                             && (   get_count (MELEE_UNIT) < get_count (RANGED_UNIT) * 2
+                                 || !can_build (RANGED_UNIT));
 
       case HOUSE       :
         return (get_count (BUILDER_UNIT) >= MIN_BUILDER_UNITS || m_population_use < MIN_BUILDER_UNITS)
@@ -151,7 +153,7 @@ bool game_step_t::need_build (const EntityType type) const
         return get_count (BUILDER_UNIT) >= MIN_BUILDER_UNITS
             && get_count (BUILDER_UNIT) > get_count (TURRET)
             && 1.0 * m_population_use / m_population_max > 0.65
-            && get_count (BUILDER_UNIT) > 0;
+            && get_count (BUILDER_BASE) > 0;
       case WALL        :
         return get_count (BUILDER_UNIT) >= MIN_BUILDER_UNITS
             && (   get_count (WALL) < 2
@@ -167,6 +169,23 @@ bool game_step_t::need_build (const EntityType type) const
       default: break;
     }
   return false;
+}
+
+bool game_step_t::can_build (const EntityType type) const
+{
+  if (m_resource < entity_price (type))
+    return false;
+  switch (type)
+    {
+      case BUILDER_UNIT:
+        return get_count (BUILDER_BASE) != 0 && m_entity.at (BUILDER_BASE)[0].active;
+      case RANGED_UNIT:
+        return get_count (RANGED_BASE) != 0 && m_entity.at (RANGED_BASE)[0].active;
+      case MELEE_UNIT:
+        return get_count (MELEE_BASE) != 0 && m_entity.at (MELEE_BASE)[0].active;
+      default: break;
+    }
+  return get_count (BUILDER_UNIT) > 0  && get_place_for (type).x != -1;
 }
 
 int game_step_t::entity_price (const EntityType type, const int cnt) const
