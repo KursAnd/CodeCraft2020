@@ -13,8 +13,9 @@ private:
   Action *result;
 
   std::unordered_map<EntityType, std::vector<Vec2Int>> priority_places_for_building;
-  static std::unordered_set<int> destroyed_pos;
   std::vector<Vec2Int> attack_pos;
+
+  static std::unordered_set<int> destroyed_pos;
   int choose_atack_pos (const Vec2Int old_pos = Vec2Int (-1, -1));
   int get_id_pos_by_vec (const Vec2Int pos);
 
@@ -62,6 +63,8 @@ public:
   static int get_distance (const Entity &ent_a, const Entity &ent_b);
   int get_distance (const Vec2Int &pos, const Entity &ent_b, const EntityType type) const;
   bool get_pos_for_safe_operation (const EntityType type, Vec2Int &pos) const;
+
+  int count_workers_to_repair (const EntityType type) const;
   
 
   bool buy_entity (const EntityType type, const int cnt = 1);

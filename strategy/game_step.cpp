@@ -58,9 +58,6 @@ game_step_t::game_step_t (const PlayerView &_playerView, Action &_result)
   for (const EntityType tupe : {WALL, HOUSE, BUILDER_BASE, BUILDER_UNIT, MELEE_BASE,  MELEE_UNIT, RANGED_BASE, RANGED_UNIT, RESOURCE, TURRET})
     m_entity[tupe] = std::vector <Entity> ();
 
-  
-  attack_pos = {{playerView->mapSize - 5, 5}, {playerView->mapSize - 5, playerView->mapSize - 5}, {5, playerView->mapSize - 5}};
-
   {
     std::unordered_map<EntityType, std::vector<Vec2Int>> &res = priority_places_for_building;
     res[HOUSE]  = { {0, 0}, {4, 0}, {0, 4}, {7, 0}, {0, 7}, {10, 0}, {0, 10}, {13, 0}, {0, 13}, {11, 3}, {3, 11}, {16, 0}, {0, 16}, {11, 6}, {6, 11}, {13, 11}, {10, 11} };
@@ -77,9 +74,9 @@ game_step_t::game_step_t (const PlayerView &_playerView, Action &_result)
     res[RANGED_UNIT] = {};
     res[RESOURCE] = {};
   }
-
-
-
+  {
+    attack_pos = {{playerView->mapSize - 5, 5}, {playerView->mapSize - 5, playerView->mapSize - 5}, {5, playerView->mapSize - 5}};
+  }
 
   m_id = playerView->myId;
   for (const auto &player : playerView->players)
@@ -139,7 +136,7 @@ Vec2Int game_step_t::get_place_for (const EntityType type) const
 
 bool game_step_t::need_build (const EntityType type) const
 {
-  if (collect_money || m_resource < entity_price (type))
+  if (m_resource < entity_price (type))
     return false;
   switch (type)
     {
@@ -148,18 +145,25 @@ bool game_step_t::need_build (const EntityType type) const
       case MELEE_UNIT  : return get_count (BUILDER_UNIT) >= MIN_BUILDER_UNITS && get_count (MELEE_UNIT) < get_count (RANGED_UNIT) * 2;
 
       case HOUSE       :
-        return get_count (BUILDER_UNIT) >= MIN_BUILDER_UNITS
+        return (get_count (BUILDER_UNIT) >= MIN_BUILDER_UNITS || m_population_use < MIN_BUILDER_UNITS)
             && m_population_use + 5 >= m_population_max_future;
       case TURRET      :
         return get_count (BUILDER_UNIT) >= MIN_BUILDER_UNITS
             && get_count (BUILDER_UNIT) > get_count (TURRET)
-            && 1.0 * m_population_use / m_population_max > 0.65;
+            && 1.0 * m_population_use / m_population_max > 0.65
+            && !collect_money;
       case WALL        :
         return get_count (BUILDER_UNIT) >= MIN_BUILDER_UNITS
             && (   get_count (WALL) < 2
                 || (   get_count (TURRET) > 3
                     && get_count (WALL) < get_count (TURRET) * 2
-                    && 1.0 * m_population_use / m_population_max > 0.7)); 
+                    && 1.0 * m_population_use / m_population_max > 0.7))
+            && !collect_money;
+
+      case BUILDER_BASE:
+      case RANGED_BASE :
+      case MELEE_BASE  :
+        return get_count (type) == 0;
       default: break;
     }
   return false;
@@ -316,6 +320,24 @@ bool game_step_t::get_pos_for_safe_operation (const EntityType type, Vec2Int &po
         }
     }
   return attacked;
+}
+
+int game_step_t::count_workers_to_repair (const EntityType type) const
+{
+  // TO-DO: make it by id and count free places
+  switch (type)
+    {
+      case BUILDER_BASE:
+      case MELEE_BASE:
+      case RANGED_BASE:
+        return 5;
+      case HOUSE:
+      case TURRET:
+        return 2;
+      case WALL:
+        return 1;
+    }
+  return 0;
 }
 
 void game_step_t::try_build (const EntityType buildType)
@@ -590,9 +612,7 @@ void game_step_t::run_tasks ()
 
 void game_step_t::add_repair_task (const int id, const int id_rep)
 {
-  // TO-DO: allow to repair by several builders analiticaly
-  int max_rep = std::max (2, get_count (BUILDER_UNIT) / MIN_BUILDER_UNITS + 1);
-  if (repair_ids[id_rep] >= max_rep)
+  if (repair_ids[id_rep] >= count_workers_to_repair (m_entity_type_by_id[id_rep]))
     return;
   game_step_t::repair_tasks[id] = id_rep;
   repair_ids[id_rep]++;
