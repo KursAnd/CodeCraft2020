@@ -305,9 +305,9 @@ bool game_step_t::is_first_building_attaked (const EntityType type) const
   return false;
 }
 
-bool game_step_t::is_place_free_or_worker (const int x, const int y) const
+bool game_step_t::is_place_free_or_my (const int x, const int y, const int id) const
 {
-  return is_place_free (x, y) || is_place_contain (x, y, BUILDER_UNIT);
+  return is_place_free (x, y) || map_id.at (x).at (y) == id;
 }
 
 bool game_step_t::is_place_free (const int x, const int y) const
@@ -354,10 +354,11 @@ Vec2Int game_step_t::get_cleaner_aim () const
   return Vec2Int (-1, -1);
 }
 
-int game_step_t::get_distance_for_base (const Vec2Int pos_a, const Vec2Int &pos_b, const EntityType type_b, Vec2Int &best_pos) const
+int game_step_t::get_distance_for_base (const int id_a, const Vec2Int &pos_b, const EntityType type_b, Vec2Int &best_pos) const
 {
+  const Vec2Int pos_a = m_entity_by_id.at (id_a).position;
   int res = get_max_distance ();
-  for (const Vec2Int pos : get_nearest_free_places (pos_b, type_b))
+  for (const Vec2Int pos : get_nearest_free_places_for_me (id_a, pos_b, type_b))
     {
       int dist = get_distance (pos_a, pos);
       if (res > dist)
@@ -402,31 +403,54 @@ bool game_step_t::get_pos_for_safe_operation (const EntityType type, Vec2Int &po
   return attacked;
 }
 
-std::vector<Vec2Int> game_step_t::get_nearest_free_places (const int id) const
+void game_step_t::get_nearest_worker_and_best_pos (const Vec2Int build_pos, const EntityType buildType, const Entity *&entity, Vec2Int &best_pos) const
 {
-  const Entity &entity = m_entity_by_id.at (id);
-  return get_nearest_free_places (entity.position, entity.entityType);
+  Vec2Int temp_pos (-1, -1);
+  int dist = get_max_distance ();
+  for (const Entity &_entity : get_vector (BUILDER_UNIT))
+    {
+      if (!is_busy (_entity))
+        {
+          const int new_dist = get_distance_for_base (_entity.id, build_pos, buildType, temp_pos);
+          if (new_dist == get_max_distance ())
+            continue;
+          if (!entity || new_dist < dist)
+            {
+              entity = &_entity;
+              best_pos = temp_pos;
+              if (new_dist == 0)
+                break;
+              dist = new_dist;
+            }
+        }
+    }
 }
 
-std::vector<Vec2Int> game_step_t::get_nearest_free_places (const Vec2Int pos, const EntityType type) const
+std::vector<Vec2Int> game_step_t::get_nearest_free_places_for_me (const int id_a, const int id_b) const
+{
+  const Entity &entity = m_entity_by_id.at (id_b);
+  return get_nearest_free_places_for_me (id_a, entity.position, entity.entityType);
+}
+
+std::vector<Vec2Int> game_step_t::get_nearest_free_places_for_me (const int id_worker, const Vec2Int pos, const EntityType type) const
 {
   const EntityProperties &properties = playerView->entityProperties.at (type);
   std::vector<Vec2Int> res;
   if (pos.x > 0)
     for (int y = pos.y; y < pos.y + properties.size; ++y)
-      if (is_place_free_or_worker (pos.x - 1, y))
+      if (is_place_free_or_my (pos.x - 1, y, id_worker))
         res.push_back (Vec2Int (pos.x - 1, y));
   if (pos.y > 0)
     for (int x = pos.x; x < pos.x + properties.size; ++x)
-      if (is_place_free_or_worker (x, pos.y - 1))
+      if (is_place_free_or_my (x, pos.y - 1, id_worker))
         res.push_back (Vec2Int (x, pos.y - 1));
   if (pos.x < playerView->mapSize - 1)
     for (int y = pos.y; y < pos.y + properties.size; ++y)
-      if (is_place_free_or_worker (pos.x + properties.size, y))
+      if (is_place_free_or_my (pos.x + properties.size, y, id_worker))
         res.push_back (Vec2Int (pos.x + properties.size, y));
   if (pos.x < playerView->mapSize - 1)
     for (int x = pos.x; x < pos.x + properties.size; ++x)
-      if (is_place_free_or_worker (x, pos.y + properties.size))
+      if (is_place_free_or_my (x, pos.y + properties.size, id_worker))
         res.push_back (Vec2Int (x, pos.y + properties.size));
   return std::move (res);
 }
@@ -457,34 +481,19 @@ void game_step_t::try_build (const EntityType buildType)
   Vec2Int build_pos = get_place_for (buildType);
   if (build_pos.x < 0)
     return;
+  
+  const EntityProperties &buildProperties = playerView->entityProperties.at (buildType);
 
   int builders_cnt = 0;
   while (builders_cnt < count_workers_to_repair (buildType))
     {
       const Entity *entity = nullptr;
-      int dist = get_max_distance ();
-      Vec2Int best_pos (-1, -1), temp_pos (-1, -1);
-      for (const Entity &_entity : get_vector (BUILDER_UNIT))
-        {
-          if (!is_busy (_entity))
-            {
-              const int new_dist = get_distance_for_base (_entity.position, build_pos, buildType, temp_pos);
-              if (new_dist == get_max_distance ())
-                continue;
-              if (!entity || new_dist < dist)
-                {
-                  entity = &_entity;
-                  best_pos = temp_pos;
-                  if (new_dist == 0)
-                    break;
-                  dist = new_dist;
-                }
-            }
-        }
+      Vec2Int best_pos (-1, -1);
+      
+      get_nearest_worker_and_best_pos (build_pos, buildType, entity, best_pos);
+
       if (!entity || best_pos.x == -1)
         break;
-
-      const EntityProperties &buildProperties = playerView->entityProperties.at (buildType);
 
       std::shared_ptr<MoveAction>   moveAction   = std::shared_ptr<MoveAction> (new MoveAction (best_pos, true, true));
       std::shared_ptr<BuildAction>  buildAction  = std::shared_ptr<BuildAction> (new BuildAction (buildType, build_pos));
@@ -494,6 +503,8 @@ void game_step_t::try_build (const EntityType buildType)
       make_busy (*entity);
       result->entityActions[entity->id] = EntityAction (moveAction, buildAction, atackAction, repairAction);
       builders_cnt++;
+      map[best_pos.x][best_pos.y] = BUILDER_UNIT + 10; // hack 
+      map_id[best_pos.x][best_pos.y] = entity->id; // TO-DO: I'm not sure in it
     }
 
   if (builders_cnt > 0)
@@ -534,23 +545,29 @@ void game_step_t::check_repair (const EntityType repairType)
       if (repair_entity.health >= properties.maxHealth)
         continue;
 
-      // TO-DO: let rebuild all workers near building
-      const Entity *entity = nullptr;
-      for (const Entity &_entity : get_vector (BUILDER_UNIT))
+      int repairs_cnt = 0;
+      while (repairs_cnt < count_workers_to_repair (repairType))
         {
-          if (!is_busy (_entity) && (!entity || get_distance (repair_entity.position, _entity.position) < get_distance (repair_entity.position, entity->position)))
-            entity = &_entity;
+          const Entity *entity = nullptr;
+          Vec2Int best_pos (-1, -1);
+      
+          get_nearest_worker_and_best_pos (repair_entity.position, repairType, entity, best_pos);
+
+          if (!entity || best_pos.x == -1)
+            break;
+
+          std::shared_ptr<MoveAction>   moveAction   = std::shared_ptr<MoveAction> (new MoveAction (best_pos, true, true));
+          std::shared_ptr<BuildAction>  buildAction  = nullptr;
+          std::shared_ptr<AttackAction> atackAction  = nullptr;
+          std::shared_ptr<RepairAction> repairAction = std::shared_ptr<RepairAction> (new RepairAction (repair_entity.id));
+
+          //add_repair_task (entity->id, repair_entity.id);
+          make_busy (entity->id);
+          result->entityActions[entity->id] = EntityAction (moveAction, buildAction, atackAction, repairAction);
+          repairs_cnt++;
+          map[best_pos.x][best_pos.y] = BUILDER_UNIT + 10; // hack 
+          map_id[best_pos.x][best_pos.y] = entity->id; // TO-DO: I'm not sure in it
         }
-      if (!entity)
-        continue;
-
-      std::shared_ptr<MoveAction>   moveAction   = std::shared_ptr<MoveAction> (new MoveAction (repair_entity.position, true, true));
-      std::shared_ptr<BuildAction>  buildAction  = nullptr;
-      std::shared_ptr<AttackAction> atackAction  = nullptr;
-      std::shared_ptr<RepairAction> repairAction = std::shared_ptr<RepairAction> (new RepairAction (repair_entity.id));
-
-      add_repair_task (entity->id, repair_entity.id);
-      result->entityActions[entity->id] = EntityAction (moveAction, buildAction, atackAction, repairAction);
     }
 }
 

@@ -62,17 +62,18 @@ public:
   bool is_busy (const Entity &entity) const;
   bool is_empty_space_for_type (const Vec2Int pos, const EntityType type) const;
   bool is_first_building_attaked (const EntityType type) const;
-  bool is_place_free_or_worker (const int x, const int y) const;
+  bool is_place_free_or_my (const int x, const int y, const int id) const;
   bool is_place_free (const int x, const int y) const;
   bool is_place_contain (const int x, const int y, const EntityType type) const;
 
   Vec2Int get_cleaner_aim () const;
   int get_max_distance () const;
+  void get_nearest_worker_and_best_pos (const Vec2Int build_pos, const EntityType buildType, const Entity *&entity, Vec2Int &best_pos) const;
   static int get_distance (const Vec2Int pos_a, const Vec2Int pos_b);
-  int get_distance_for_base (const Vec2Int pos_a, const Vec2Int &pos_b, const EntityType type_b, Vec2Int &best_pos) const;
+  int get_distance_for_base (const int id_a, const Vec2Int &pos_b, const EntityType type_b, Vec2Int &best_pos) const;
   bool get_pos_for_safe_operation (const EntityType type, Vec2Int &pos) const;
-  std::vector<Vec2Int> get_nearest_free_places (const int id) const;
-  std::vector<Vec2Int> get_nearest_free_places (const Vec2Int pos, const EntityType type) const;
+  std::vector<Vec2Int> get_nearest_free_places_for_me (const int id_a, const int id_b) const;
+  std::vector<Vec2Int> get_nearest_free_places_for_me (const int id_a, const Vec2Int pos, const EntityType type) const;
 
   int count_workers_to_repair (const EntityType type) const;
   
