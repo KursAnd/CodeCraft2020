@@ -395,12 +395,12 @@ int game_step_t::count_workers_to_repair (const EntityType type) const
       case BUILDER_BASE:
       case MELEE_BASE:
       case RANGED_BASE:
-        return 5;
+        return 6;
       case HOUSE:
       case TURRET:
-        return 2;
+        return 3;
       case WALL:
-        return 1;
+        return 2;
     }
   return 0;
 }
@@ -414,40 +414,46 @@ void game_step_t::try_build (const EntityType buildType)
   if (build_pos.x < 0)
     return;
 
-  const Entity *entity = nullptr;
-  int dist = get_max_distance ();
-  Vec2Int best_pos (-1, -1), temp_pos (-1, -1);
-  for (const Entity &_entity : get_vector (BUILDER_UNIT))
+  int builders_cnt = 0;
+  while (builders_cnt < count_workers_to_repair (buildType))
     {
-      if (!is_busy (_entity))
+      const Entity *entity = nullptr;
+      int dist = get_max_distance ();
+      Vec2Int best_pos (-1, -1), temp_pos (-1, -1);
+      for (const Entity &_entity : get_vector (BUILDER_UNIT))
         {
-          const int new_dist = get_distance_for_base (_entity.position, build_pos, buildType, temp_pos);
-          if (new_dist == get_max_distance ())
-            continue;
-          if (!entity || new_dist < dist)
+          if (!is_busy (_entity))
             {
-              entity = &_entity;
-              best_pos = temp_pos;
-              if (new_dist == 0)
-                break;
-              dist = new_dist;
+              const int new_dist = get_distance_for_base (_entity.position, build_pos, buildType, temp_pos);
+              if (new_dist == get_max_distance ())
+                continue;
+              if (!entity || new_dist < dist)
+                {
+                  entity = &_entity;
+                  best_pos = temp_pos;
+                  if (new_dist == 0)
+                    break;
+                  dist = new_dist;
+                }
             }
         }
+      if (!entity || best_pos.x == -1)
+        break;
+
+      const EntityProperties &buildProperties = playerView->entityProperties.at (buildType);
+
+      std::shared_ptr<MoveAction>   moveAction   = std::shared_ptr<MoveAction> (new MoveAction (best_pos, true, true));
+      std::shared_ptr<BuildAction>  buildAction  = std::shared_ptr<BuildAction> (new BuildAction (buildType, build_pos));
+      std::shared_ptr<AttackAction> atackAction  = nullptr;
+      std::shared_ptr<RepairAction> repairAction = nullptr;
+
+      make_busy (*entity);
+      result->entityActions[entity->id] = EntityAction (moveAction, buildAction, atackAction, repairAction);
+      builders_cnt++;
     }
-  if (!entity || best_pos.x == -1)
-    return;
 
-  const EntityProperties &buildProperties = playerView->entityProperties.at (buildType);
-
-  std::shared_ptr<MoveAction>   moveAction   = std::shared_ptr<MoveAction> (new MoveAction (best_pos, true, true));
-  std::shared_ptr<BuildAction>  buildAction  = std::shared_ptr<BuildAction> (new BuildAction (buildType, build_pos));
-  std::shared_ptr<AttackAction> atackAction  = nullptr;
-  std::shared_ptr<RepairAction> repairAction = nullptr;
-
-  make_busy (*entity);
-  buy_entity (buildType);
-          
-  result->entityActions[entity->id] = EntityAction (moveAction, buildAction, atackAction, repairAction);
+  if (builders_cnt > 0)
+    buy_entity (buildType);
 }
 
 void game_step_t::train_unit (const EntityType factoryType)
