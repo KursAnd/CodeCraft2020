@@ -4,7 +4,7 @@
 std::unordered_map<int, int> game_step_t::repair_tasks;
 std::unordered_map<int, Vec2Int> game_step_t::attack_move_tasks;
 std::unordered_set<int> game_step_t::destroyed_pos;
-int game_step_t::cleaner_lv = 0;
+std::vector<int> game_step_t::cleaner_lvs = {0, 2};
 
 int game_step_t::choose_atack_pos (const Vec2Int old_pos)
 {
@@ -160,10 +160,13 @@ bool game_step_t::need_build (const EntityType type) const
     return false;
   switch (type)
     {
-      case BUILDER_UNIT: return get_count (BUILDER_UNIT) < std::max (MIN_BUILDER_UNITS, m_population_max * 4 / 10);
+      case BUILDER_UNIT: return get_count (BUILDER_UNIT) < std::max (MIN_BUILDER_UNITS, m_population_max * 4 / 10)
+                             || (get_count (BUILDER_UNIT) < MIN_BUILDER_UNITS * 2 && !can_build (RANGED_UNIT) && !can_build (MELEE_UNIT));
       case RANGED_UNIT : return get_count (BUILDER_UNIT) >= MIN_BUILDER_UNITS;
       case MELEE_UNIT  : return get_count (BUILDER_UNIT) >= MIN_BUILDER_UNITS
-                             && (   get_count (MELEE_UNIT) < get_count (RANGED_UNIT) * 2
+                             && (   (m_population_use <  40                          && get_count (MELEE_UNIT)     < get_count (RANGED_UNIT)    )
+                                 || (m_population_use >= 40 && m_population_use < 80 && get_count (MELEE_UNIT) * 3 < get_count (RANGED_UNIT) * 2)
+                                 || (m_population_max >= 80                          && get_count (MELEE_UNIT)     < get_count (RANGED_UNIT) * 2)
                                  || !can_build (RANGED_UNIT));
 
       case HOUSE       :
@@ -171,15 +174,17 @@ bool game_step_t::need_build (const EntityType type) const
             && m_population_use + 10 >= m_population_max_future;
       case TURRET      :
         return get_count (BUILDER_UNIT) >= MIN_BUILDER_UNITS
-            && m_population_max >= 30
+            && m_population_max > 30
+            && m_population_use > 25
             && 1.0 * m_population_use / m_population_max > 0.65
             && get_count (BUILDER_BASE) > 0;
       case WALL        :
         return get_count (BUILDER_UNIT) >= MIN_BUILDER_UNITS
-            && m_population_max >= 30
+            && m_population_max > 30
+            && m_population_use > 25
             && (   get_count (WALL) < 2
                 || (   get_count (TURRET) > 3
-                    && get_count (WALL) < get_count (TURRET) * 2
+                    && get_count (WALL) * 2 < get_count (TURRET) * 3
                     && 1.0 * m_population_use / m_population_max > 0.7))
             && get_base_count () >= 2;
 
@@ -330,14 +335,14 @@ int game_step_t::get_distance (const Vec2Int pos_a, const Vec2Int pos_b)
   return std::abs (pos_a.x - pos_b.x) + std::abs (pos_a.y - pos_b.y);
 }
 
-Vec2Int game_step_t::get_cleaner_aim () const
+Vec2Int game_step_t::get_cleaner_aim (const int cleaner_id) const
 {
-  if (game_step_t::cleaner_lv >= game_step_t::cleaner_aims.size ())
+  if (game_step_t::cleaner_lvs[cleaner_id] >= game_step_t::cleaner_aims.size ())
     return Vec2Int (-1, -1);
-  while (game_step_t::cleaner_lv < game_step_t::cleaner_aims.size ())
+  while (game_step_t::cleaner_lvs[cleaner_id] < game_step_t::cleaner_aims.size ())
     {
-      const EntityType type = game_step_t::cleaner_aims.at (game_step_t::cleaner_lv).first;
-      const int lv          = game_step_t::cleaner_aims.at (game_step_t::cleaner_lv).second;
+      const EntityType type = game_step_t::cleaner_aims.at (game_step_t::cleaner_lvs[cleaner_id]).first;
+      const int lv          = game_step_t::cleaner_aims.at (game_step_t::cleaner_lvs[cleaner_id]).second;
       const Vec2Int pos = priority_places_for_building.at (type).at (lv);
       const EntityProperties &properties = playerView->entityProperties.at (type);
       if (!is_place_contain (pos.x, pos.y, type))
@@ -349,7 +354,7 @@ Vec2Int game_step_t::get_cleaner_aim () const
                   return Vec2Int (x, y);
               }
         }
-      game_step_t::cleaner_lv++;      
+      game_step_t::cleaner_lvs[cleaner_id]++;      
     }
   return Vec2Int (-1, -1);
 }
@@ -680,28 +685,33 @@ void game_step_t::move_solder (const Entity &entity, const Vec2Int &pos, bool ne
   result->entityActions[entity.id] = EntityAction (moveAction, buildAction, atackAction, repairAction);
 }
 
-void game_step_t::send_cleaner ()
+void game_step_t::send_cleaners ()
 {
-  const Vec2Int pos = get_cleaner_aim ();
-  if (pos.x < 0)
-    return;
-
-  const EntityType type = BUILDER_UNIT;
-  const EntityProperties &properties = playerView->entityProperties.at (type);
-
-  for (const Entity &entity : get_vector (type))
+  if (cleaner_lvs.size () == 2 && m_population_max > 15)
+    cleaner_lvs.push_back (cleaner_lvs.back () + 2);
+  for (int cleaner_id = 0; cleaner_id < game_step_t::cleaner_lvs.size (); ++cleaner_id)
     {
-      if (is_busy (entity))
-        continue;
+      const Vec2Int pos = get_cleaner_aim (cleaner_id);
+      if (pos.x < 0)
+        return;
 
-      std::shared_ptr<MoveAction>   moveAction   = std::shared_ptr<MoveAction> (new MoveAction (pos, false, true));
-      std::shared_ptr<BuildAction>  buildAction  = nullptr;
-      std::shared_ptr<AttackAction> atackAction  = std::shared_ptr<AttackAction> (new AttackAction (std::shared_ptr<int> (new int (map_id[pos.x][pos.y])), nullptr));
-      std::shared_ptr<RepairAction> repairAction = nullptr;
+      const EntityType type = BUILDER_UNIT;
+      const EntityProperties &properties = playerView->entityProperties.at (type);
 
-      make_busy (entity.id);
-      result->entityActions[entity.id] = EntityAction (moveAction, buildAction, atackAction, repairAction);
-      break;
+      for (const Entity &entity : get_vector (type))
+        {
+          if (is_busy (entity))
+            continue;
+
+          std::shared_ptr<MoveAction>   moveAction   = std::shared_ptr<MoveAction> (new MoveAction (pos, false, true));
+          std::shared_ptr<BuildAction>  buildAction  = nullptr;
+          std::shared_ptr<AttackAction> atackAction  = std::shared_ptr<AttackAction> (new AttackAction (std::shared_ptr<int> (new int (map_id[pos.x][pos.y])), nullptr));
+          std::shared_ptr<RepairAction> repairAction = nullptr;
+
+          make_busy (entity.id);
+          result->entityActions[entity.id] = EntityAction (moveAction, buildAction, atackAction, repairAction);
+          break;
+        }
     }
 }
 

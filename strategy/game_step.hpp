@@ -19,7 +19,7 @@ private:
   int choose_atack_pos (const Vec2Int old_pos = Vec2Int (-1, -1));
   int get_id_pos_by_vec (const Vec2Int pos);
 
-  static int cleaner_lv;
+  static std::vector<int> cleaner_lvs;
   std::vector<std::pair<EntityType, int>> cleaner_aims;
 
   const int MIN_BUILDER_UNITS = 13;
@@ -66,7 +66,7 @@ public:
   bool is_place_free (const int x, const int y) const;
   bool is_place_contain (const int x, const int y, const EntityType type) const;
 
-  Vec2Int get_cleaner_aim () const;
+  Vec2Int get_cleaner_aim (const int cleaner_id) const;
   int get_max_distance () const;
   void get_nearest_worker_and_best_pos (const Vec2Int build_pos, const EntityType buildType, const Entity *&entity, Vec2Int &best_pos) const;
   static int get_distance (const Vec2Int pos_a, const Vec2Int pos_b);
@@ -89,7 +89,7 @@ public:
   void turn_on_turrets ();
   void make_atack_groups ();
   void move_solder (const Entity &entity, const Vec2Int &pos, bool need_add_task = true);
-  void send_cleaner ();
+  void send_cleaners ();
 
   void run_tasks ();
   void add_repair_task (const int id, const int id_rep);
