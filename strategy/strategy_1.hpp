@@ -14,6 +14,7 @@ void strategy_1 (const PlayerView& playerView, DebugInterface* debugInterface, A
 
   gs.run_tasks ();
   gs.send_cleaners ();
+  gs.send_earners ();
 
   gs.check_repair (BUILDER_BASE);
   gs.check_repair (MELEE_BASE);

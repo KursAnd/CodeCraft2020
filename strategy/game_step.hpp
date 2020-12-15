@@ -31,6 +31,7 @@ private:
   int m_population_use = 0;
 
   Vec2Int m_res_pos;  // purpouse for BUILDERs who collect thr resources
+  const Vec2Int INCORRECT_VEC2INT = Vec2Int(-1, -1);
 
   std::unordered_map<int, EntityType> m_entity_type_by_id;
   std::unordered_map<int, Entity> m_entity_by_id;
@@ -39,6 +40,9 @@ private:
   std::unordered_set<int> ids_was;
   std::vector<std::vector<int>> map;
   std::vector<std::vector<int>> map_id;
+
+  std::unordered_map<EntityType, std::vector<Entity>> m_enemy;
+
   
   std::unordered_map<int, int> repair_ids;
   static std::unordered_map<int, int> repair_tasks;
@@ -65,6 +69,7 @@ public:
   bool is_place_free_or_my (const int x, const int y, const int id) const;
   bool is_place_free (const int x, const int y) const;
   bool is_place_contain (const int x, const int y, const EntityType type) const;
+  bool is_correct (const Vec2Int pos) const;
 
   Vec2Int get_cleaner_aim (const int cleaner_id) const;
   int get_max_distance () const;
@@ -90,6 +95,7 @@ public:
   void make_atack_groups ();
   void move_solder (const Entity &entity, const Vec2Int &pos, bool need_add_task = true);
   void send_cleaners ();
+  void send_earners ();
 
   void run_tasks ();
   void add_repair_task (const int id, const int id_rep);

@@ -11,14 +11,14 @@ int game_step_t::choose_atack_pos (const Vec2Int old_pos)
   if (destroyed_pos.size () == attack_pos.size ())
     destroyed_pos.clear ();
 
-  if (old_pos.x != -1)
+  if (is_correct (old_pos))
     {
       int old_dir = get_id_pos_by_vec (old_pos);
       if ((old_dir == 0 || old_dir == 2) && !destroyed_pos.count (1))
         return 1;
     }
 
-  if (old_pos.x == -1 && (!destroyed_pos.count (0) || !destroyed_pos.count (2)))
+  if (!is_correct (old_pos) && (!destroyed_pos.count (0) || !destroyed_pos.count (2)))
     {
       int dir = -1;
       do
@@ -100,18 +100,25 @@ game_step_t::game_step_t (const PlayerView &_playerView, Action &_result)
       }
 
   for (const Entity &entity : playerView->entities)
-    if (entity.playerId != nullptr && *entity.playerId == m_id)
+    if (entity.playerId != nullptr)
       {
-        m_entity_type_by_id[entity.id] = entity.entityType;
-        m_entity_by_id[entity.id] = entity;
-        m_entity_set[entity.entityType].insert (entity.id);
-        m_entity[entity.entityType].push_back (entity);
+        if (*entity.playerId == m_id)
+          {
+            m_entity_type_by_id[entity.id] = entity.entityType;
+            m_entity_by_id[entity.id] = entity;
+            m_entity_set[entity.entityType].insert (entity.id);
+            m_entity[entity.entityType].push_back (entity);
 
-        const EntityProperties &properties = playerView->entityProperties.at (entity.entityType);
-        if (entity.active)
-          m_population_max += properties.populationProvide;
-        m_population_max_future += properties.populationProvide;
-        m_population_use += properties.populationUse;
+            const EntityProperties &properties = playerView->entityProperties.at (entity.entityType);
+            if (entity.active)
+              m_population_max += properties.populationProvide;
+            m_population_max_future += properties.populationProvide;
+            m_population_use += properties.populationUse;
+          }
+        else
+          {
+            m_enemy[entity.entityType].push_back (entity);
+          }
       }
     else if (entity.entityType == RESOURCE)
       {
@@ -135,7 +142,10 @@ game_step_t::game_step_t (const PlayerView &_playerView, Action &_result)
       for (int x = entity.position.x; x < entity.position.x + properties.size; ++x)
         for (int y = entity.position.y; y < entity.position.y + properties.size; ++y)
           {
-            map[x][y] = entity.entityType + 1;
+            if (entity.playerId == nullptr || entity.id == m_id)
+              map[x][y] = entity.entityType + 1;
+            else
+              map[x][y] = -(entity.entityType + 1);
             map_id[x][y] = entity.id;
           }
     }
@@ -151,7 +161,7 @@ Vec2Int game_step_t::get_place_for (const EntityType type) const
             return vec2;
         }
     }
-  return Vec2Int (-1, -1);
+  return INCORRECT_VEC2INT;
 }
 
 bool game_step_t::need_build (const EntityType type) const
@@ -211,7 +221,7 @@ bool game_step_t::can_build (const EntityType type) const
         return get_count (MELEE_BASE) != 0 && m_entity.at (MELEE_BASE)[0].active;
       default: break;
     }
-  return get_count (BUILDER_UNIT) > 0  && get_place_for (type).x != -1;
+  return get_count (BUILDER_UNIT) > 0  && is_correct (get_place_for (type));
 }
 
 int game_step_t::entity_price (const EntityType type, const int cnt) const
@@ -335,10 +345,15 @@ int game_step_t::get_distance (const Vec2Int pos_a, const Vec2Int pos_b)
   return std::abs (pos_a.x - pos_b.x) + std::abs (pos_a.y - pos_b.y);
 }
 
+bool game_step_t::is_correct (const Vec2Int pos) const
+{
+  return pos.x >= 0 && pos.y >= 0 && pos.x < playerView->mapSize && pos.y < playerView->mapSize;
+}
+
 Vec2Int game_step_t::get_cleaner_aim (const int cleaner_id) const
 {
   if (game_step_t::cleaner_lvs[cleaner_id] >= game_step_t::cleaner_aims.size ())
-    return Vec2Int (-1, -1);
+    return INCORRECT_VEC2INT;
   while (game_step_t::cleaner_lvs[cleaner_id] < game_step_t::cleaner_aims.size ())
     {
       const EntityType type = game_step_t::cleaner_aims.at (game_step_t::cleaner_lvs[cleaner_id]).first;
@@ -356,7 +371,7 @@ Vec2Int game_step_t::get_cleaner_aim (const int cleaner_id) const
         }
       game_step_t::cleaner_lvs[cleaner_id]++;      
     }
-  return Vec2Int (-1, -1);
+  return INCORRECT_VEC2INT;
 }
 
 int game_step_t::get_distance_for_base (const int id_a, const Vec2Int &pos_b, const EntityType type_b, Vec2Int &best_pos) const
@@ -410,7 +425,7 @@ bool game_step_t::get_pos_for_safe_operation (const EntityType type, Vec2Int &po
 
 void game_step_t::get_nearest_worker_and_best_pos (const Vec2Int build_pos, const EntityType buildType, const Entity *&entity, Vec2Int &best_pos) const
 {
-  Vec2Int temp_pos (-1, -1);
+  Vec2Int temp_pos = INCORRECT_VEC2INT;
   int dist = get_max_distance ();
   for (const Entity &_entity : get_vector (BUILDER_UNIT))
     {
@@ -493,11 +508,11 @@ void game_step_t::try_build (const EntityType buildType)
   while (builders_cnt < count_workers_to_repair (buildType))
     {
       const Entity *entity = nullptr;
-      Vec2Int best_pos (-1, -1);
+      Vec2Int best_pos = INCORRECT_VEC2INT;
       
       get_nearest_worker_and_best_pos (build_pos, buildType, entity, best_pos);
 
-      if (!entity || best_pos.x == -1)
+      if (!entity || !is_correct (best_pos))
         break;
 
       std::shared_ptr<MoveAction>   moveAction   = std::shared_ptr<MoveAction> (new MoveAction (best_pos, true, true));
@@ -554,11 +569,11 @@ void game_step_t::check_repair (const EntityType repairType)
       while (repairs_cnt < count_workers_to_repair (repairType))
         {
           const Entity *entity = nullptr;
-          Vec2Int best_pos (-1, -1);
+          Vec2Int best_pos = INCORRECT_VEC2INT;
       
           get_nearest_worker_and_best_pos (repair_entity.position, repairType, entity, best_pos);
 
-          if (!entity || best_pos.x == -1)
+          if (!entity || !is_correct (best_pos))
             break;
 
           std::shared_ptr<MoveAction>   moveAction   = std::shared_ptr<MoveAction> (new MoveAction (best_pos, true, true));
@@ -794,6 +809,11 @@ void game_step_t::add_move_task (const int id, const Vec2Int pos)
 {
   game_step_t::attack_move_tasks[id] = pos;
   make_busy (id);
+}
+
+void game_step_t::send_earners ()
+{
+  // TO-DO: send several workers anyway
 }
 
 void game_step_t::redirect_all_atack_move_tasks (const Vec2Int old_pos, const Vec2Int new_pos)
