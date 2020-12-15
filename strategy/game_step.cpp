@@ -56,8 +56,11 @@ game_step_t::game_step_t (const PlayerView &_playerView, Action &_result)
     m_res_pos (_playerView.mapSize - 1, _playerView.mapSize - 1)
 {
   // hack to avoid const wraper that doesn't work on platform ..
-  for (const EntityType tupe : {WALL, HOUSE, BUILDER_BASE, BUILDER_UNIT, MELEE_BASE,  MELEE_UNIT, RANGED_BASE, RANGED_UNIT, RESOURCE, TURRET})
-    m_entity[tupe] = std::vector <Entity> ();
+  for (const EntityType type : {WALL, HOUSE, BUILDER_BASE, BUILDER_UNIT, MELEE_BASE,  MELEE_UNIT, RANGED_BASE, RANGED_UNIT, RESOURCE, TURRET})
+    {
+      m_entity[type] = std::vector <Entity> ();
+      m_enemy[type] = std::vector<Entity> ();
+    }
 
   {
     std::unordered_map<EntityType, std::vector<Vec2Int>> &res = priority_places_for_building;
@@ -142,7 +145,7 @@ game_step_t::game_step_t (const PlayerView &_playerView, Action &_result)
       for (int x = entity.position.x; x < entity.position.x + properties.size; ++x)
         for (int y = entity.position.y; y < entity.position.y + properties.size; ++y)
           {
-            if (entity.playerId == nullptr || entity.id == m_id)
+            if (entity.playerId == nullptr || *entity.playerId == m_id)
               map[x][y] = entity.entityType + 1;
             else
               map[x][y] = -(entity.entityType + 1);
@@ -335,6 +338,11 @@ bool game_step_t::is_place_contain (const int x, const int y, const EntityType t
   return map.at (x).at (y) == type + 1; // 0 is empty
 }
 
+bool game_step_t::is_place_contain_enemy (const int x, const int y, const EntityType type) const
+{
+  return map.at (x).at (y) == -(type + 1); // 0 is empty
+}
+
 int game_step_t::get_max_distance () const
 {
   return playerView->mapSize * 2;
@@ -348,6 +356,11 @@ int game_step_t::get_distance (const Vec2Int pos_a, const Vec2Int pos_b)
 bool game_step_t::is_correct (const Vec2Int pos) const
 {
   return pos.x >= 0 && pos.y >= 0 && pos.x < playerView->mapSize && pos.y < playerView->mapSize;
+}
+
+bool game_step_t::is_correct_xy (const int x, const int y) const
+{
+  return x >= 0 && y >= 0 && x < playerView->mapSize && y < playerView->mapSize;
 }
 
 Vec2Int game_step_t::get_cleaner_aim (const int cleaner_id) const
@@ -456,6 +469,7 @@ std::vector<Vec2Int> game_step_t::get_nearest_free_places_for_me (const int id_w
 {
   const EntityProperties &properties = playerView->entityProperties.at (type);
   std::vector<Vec2Int> res;
+  res.reserve (properties.size * 4);
   if (pos.x > 0)
     for (int y = pos.y; y < pos.y + properties.size; ++y)
       if (is_place_free_or_my (pos.x - 1, y, id_worker))
@@ -524,7 +538,7 @@ void game_step_t::try_build (const EntityType buildType)
       result->entityActions[entity->id] = EntityAction (moveAction, buildAction, atackAction, repairAction);
       builders_cnt++;
       map[best_pos.x][best_pos.y] = BUILDER_UNIT + 10; // hack 
-      map_id[best_pos.x][best_pos.y] = entity->id; // TO-DO: I'm not sure in it
+      // map_id[best_pos.x][best_pos.y] = entity->id; // TO-DO: I'm not sure in it
     }
 
   if (builders_cnt > 0)
@@ -828,4 +842,92 @@ void game_step_t::redirect_all_atack_move_tasks (const Vec2Int old_pos, const Ve
           task.second = new_pos;
         }
     }
+}
+
+void game_step_t::save_builders ()
+{
+  const EntityType type = BUILDER_UNIT;
+
+  for (const Entity &entity : get_vector (type))
+    {
+      Vec2Int safe_pos = INCORRECT_VEC2INT;
+      if (   find_escape_way_for_workers (RANGED_UNIT, entity.position, safe_pos)
+          || find_escape_way_for_workers (MELEE_UNIT , entity.position, safe_pos))
+        {
+          std::shared_ptr<MoveAction>   moveAction   = std::shared_ptr<MoveAction> (new MoveAction (safe_pos, true, true));;
+          std::shared_ptr<BuildAction>  buildAction  = nullptr;
+          std::shared_ptr<AttackAction> atackAction  = nullptr;
+          std::shared_ptr<RepairAction> repairAction = nullptr;
+
+          make_busy (entity.id);
+          map[safe_pos.x][safe_pos.y] = BUILDER_UNIT + 10; // hack 
+          // map_id[best_pos.x][best_pos.y] = entity->id; // TO-DO: I'm not sure in it
+          result->entityActions[entity.id] = EntityAction (moveAction, buildAction, atackAction, repairAction);
+        }
+    }
+}
+
+bool game_step_t::find_escape_way_for_workers (const EntityType type, const Vec2Int worker_pos, Vec2Int &safe_pos) const
+{
+  const int safe_range = playerView->entityProperties.at (type).attack->attackRange + 5;
+  const int l = 0, r = 1, d = 2, u = 3;
+  //                       l  r  d  u
+  std::vector<int> escape {0, 0, 0, 0};
+  for (const Entity &enemy : m_enemy.at (type))
+    {
+      if (get_distance (worker_pos, enemy.position) <= safe_range)
+        {
+          if (enemy.position.x > worker_pos.x) escape[l]++;
+          if (enemy.position.x < worker_pos.x) escape[r]++;
+          if (enemy.position.y > worker_pos.y) escape[d]++;
+          if (enemy.position.y < worker_pos.y) escape[u]++;
+        }
+    }
+
+  std::vector<Vec2Int> ways, bad_way, near_pos = {
+    Vec2Int (worker_pos.x - 1, worker_pos.y    ),
+    Vec2Int (worker_pos.x + 1, worker_pos.y    ),
+    Vec2Int (worker_pos.x    , worker_pos.y - 1),
+    Vec2Int (worker_pos.x    , worker_pos.y + 1)
+  };
+  ways.reserve (4);
+
+  auto choose_dir = [&] (const int l, const int u, const int d)
+    {
+      if (escape[l])
+        {
+          if (is_correct (near_pos[l]) && is_place_free (near_pos[l].x, near_pos[l].y))
+            {
+              ways.push_back (near_pos[l]);
+            }
+          else if (ways.empty () && bad_way.empty ())
+            {
+              if (!escape[u] && is_correct (near_pos[d]) && is_place_free (near_pos[d].x, near_pos[d].y))
+                bad_way.push_back (near_pos[d]);
+              else if (!escape[d] && is_correct (near_pos[u]) && is_place_free (near_pos[u].x, near_pos[u].y))
+                bad_way.push_back (near_pos[u]);
+            } 
+        }
+    };
+
+  choose_dir (l, u, d);
+  choose_dir (r, u, d);
+  choose_dir (d, l, r);
+  choose_dir (u, l, r);
+
+  if (!ways.empty ())
+    {
+      if (ways.size () == 4)
+        return false;
+
+      safe_pos = ways[rand () % ways.size ()];
+      return true;
+    }
+  if (!bad_way.empty ())
+    {
+      safe_pos = bad_way.back ();
+      return true;
+    }
+
+  return false;
 }

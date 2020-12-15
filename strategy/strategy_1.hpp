@@ -13,6 +13,7 @@ void strategy_1 (const PlayerView& playerView, DebugInterface* debugInterface, A
   game_step_t gs (playerView, result);
 
   gs.run_tasks ();
+  gs.save_builders ();
   gs.send_cleaners ();
   gs.send_earners ();
 

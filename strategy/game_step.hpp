@@ -69,7 +69,9 @@ public:
   bool is_place_free_or_my (const int x, const int y, const int id) const;
   bool is_place_free (const int x, const int y) const;
   bool is_place_contain (const int x, const int y, const EntityType type) const;
+  bool is_place_contain_enemy (const int x, const int y, const EntityType type) const;
   bool is_correct (const Vec2Int pos) const;
+  bool is_correct_xy (const int x, const int y) const;
 
   Vec2Int get_cleaner_aim (const int cleaner_id) const;
   int get_max_distance () const;
@@ -79,6 +81,7 @@ public:
   bool get_pos_for_safe_operation (const EntityType type, Vec2Int &pos) const;
   std::vector<Vec2Int> get_nearest_free_places_for_me (const int id_a, const int id_b) const;
   std::vector<Vec2Int> get_nearest_free_places_for_me (const int id_a, const Vec2Int pos, const EntityType type) const;
+  bool find_escape_way_for_workers (const EntityType type, const Vec2Int worker_pos, Vec2Int &safe_pos) const;
 
   int count_workers_to_repair (const EntityType type) const;
   
@@ -94,6 +97,7 @@ public:
   void turn_on_turrets ();
   void make_atack_groups ();
   void move_solder (const Entity &entity, const Vec2Int &pos, bool need_add_task = true);
+  void save_builders ();
   void send_cleaners ();
   void send_earners ();
 
