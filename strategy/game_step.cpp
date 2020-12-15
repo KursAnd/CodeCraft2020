@@ -132,12 +132,47 @@ game_step_t::game_step_t (const PlayerView &_playerView, Action &_result)
   if (m_res_pos.x == _playerView.mapSize - 1 && m_res_pos.y == _playerView.mapSize - 1)
     m_res_pos = Vec2Int (0, 0);
 
+  const int custom_value = (playerView->fogOfWar ? 100 : 0);
   map = std::vector<std::vector<int>> (playerView->mapSize);
   map_id = std::vector<std::vector<int>> (playerView->mapSize);
   for (int i = 0; i < playerView->mapSize; ++i)
     {
-      map[i] = std::vector<int> (playerView->mapSize, 0);
+      map[i] = std::vector<int> (playerView->mapSize, custom_value);
       map_id[i] = std::vector<int> (playerView->mapSize, -1);
+    }
+  if (playerView->fogOfWar)
+    {
+      for (const Entity &entity : playerView->entities)
+        {
+          if (entity.playerId != nullptr && *entity.playerId == m_id)
+            {
+              const EntityProperties &p = playerView->entityProperties.at (entity.entityType);
+              for (int x = std::max (0, entity.position.x - p.sightRange); x < std::min (playerView->mapSize - 1, entity.position.x + p.size + p.sightRange); ++x)
+                for (int y = entity.position.y; y < entity.position.y + p.size; ++y)
+                  map[x][y] = 0;
+              for (int x = entity.position.x; x < entity.position.x + p.size; ++x)
+                {
+                  for (int y = std::max (0, entity.position.y - p.sightRange); y < entity.position.y; ++y)
+                    map[x][y] = 0;
+                  for (int y = entity.position.y + p.size; y < std::min (playerView->mapSize - 1, entity.position.y + p.size + p.sightRange); ++y)
+                    map[x][y] = 0;
+                }
+              for (int k = 1, x = entity.position.x + p.size; x < std::min (playerView->mapSize - 1, entity.position.x + p.size + p.sightRange - 1); ++x, ++k)
+                {
+                  for (int y = entity.position.y - 1; y >= std::max (0, entity.position.y - p.sightRange + k); --y)
+                    map[x][y] = 0;
+                  for (int y = entity.position.y + p.size; y < std::min (playerView->mapSize - 1, entity.position.y + p.size + p.sightRange - k); ++y)
+                    map[x][y] = 0;
+                }
+              for (int k = 1, x = entity.position.x - 1; x >= std::max (0, entity.position.x - p.sightRange + 1); --x, ++k)
+                {
+                  for (int y = entity.position.y - 1; y >= std::max (0, entity.position.y - p.sightRange + k); --y)
+                    map[x][y] = 0;
+                  for (int y = entity.position.y + p.size; y < std::min (playerView->mapSize - 1, entity.position.y + p.size + p.sightRange - k); ++y)
+                    map[x][y] = 0;
+                }
+            }
+        }
     }
   for (const Entity &entity : playerView->entities)
     {
@@ -513,7 +548,7 @@ void game_step_t::try_build (const EntityType buildType)
     return;
 
   Vec2Int build_pos = get_place_for (buildType);
-  if (build_pos.x < 0)
+  if (!is_correct (build_pos))
     return;
   
   const EntityProperties &buildProperties = playerView->entityProperties.at (buildType);
