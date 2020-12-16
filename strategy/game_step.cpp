@@ -109,8 +109,6 @@ game_step_t::game_step_t (const PlayerView &_playerView, Action &_result)
         {
           if (*entity.playerId == m_id)
             {
-              m_entity_type_by_id[entity.id] = entity.entityType;
-              m_entity_set[entity.entityType].insert (entity.id);
               m_entity[entity.entityType].push_back (entity);
 
               const EntityProperties &properties = playerView->entityProperties.at (entity.entityType);
@@ -506,7 +504,7 @@ std::vector<Vec2Int> game_step_t::get_nearest_free_places_for_me (const int id_w
 {
   const EntityProperties &properties = playerView->entityProperties.at (type);
   std::vector<Vec2Int> res;
-  res.reserve (properties.size * 4);
+  res.reserve (static_cast<size_t> (properties.size) * 4ll);
   if (pos.x > 0)
     for (int y = pos.y; y < pos.y + properties.size; ++y)
       if (is_place_free_or_my (pos.x - 1, y, id_worker))
@@ -849,7 +847,7 @@ void game_step_t::run_tasks ()
 
 void game_step_t::add_repair_task (const int id, const int id_rep)
 {
-  if (repair_ids[id_rep] >= count_workers_to_repair (m_entity_type_by_id[id_rep]))
+  if (repair_ids[id_rep] >= count_workers_to_repair (m_entity_by_id[id_rep].entityType))
     return;
   game_step_t::repair_tasks[id] = id_rep;
   repair_ids[id_rep]++;

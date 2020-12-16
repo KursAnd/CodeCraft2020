@@ -33,9 +33,7 @@ private:
   Vec2Int m_res_pos;  // purpouse for BUILDERs who collect thr resources
   const Vec2Int INCORRECT_VEC2INT = Vec2Int(-1, -1);
 
-  std::unordered_map<int, EntityType> m_entity_type_by_id;
   std::unordered_map<int, Entity> m_entity_by_id;
-  std::unordered_map<EntityType, std::unordered_set<int>> m_entity_set;
   std::unordered_map<EntityType, std::vector<Entity>> m_entity;
   std::unordered_set<int> ids_was;
   std::vector<std::vector<int>> map;
