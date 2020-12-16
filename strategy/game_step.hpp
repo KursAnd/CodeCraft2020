@@ -13,11 +13,7 @@ private:
   Action *result;
 
   std::unordered_map<EntityType, std::vector<Vec2Int>> priority_places_for_building;
-  std::vector<Vec2Int> attack_pos;
 
-  static std::unordered_set<int> destroyed_pos;
-  int choose_atack_pos (const Vec2Int old_pos = Vec2Int (-1, -1));
-  int get_id_pos_by_vec (const Vec2Int pos);
 
   static std::vector<int> cleaner_lvs;
   std::vector<std::pair<EntityType, int>> cleaner_aims;
@@ -41,10 +37,6 @@ private:
 
   std::unordered_map<EntityType, std::vector<Entity>> m_enemy;
 
-  
-  std::unordered_map<int, int> repair_ids;
-  static std::unordered_map<int, int> repair_tasks;
-  static std::unordered_map<int, Vec2Int> attack_move_tasks;
 
 public:
   game_step_t (const PlayerView &_playerView, Action &_result);
@@ -56,14 +48,12 @@ public:
   int entity_price (const EntityType type, const int cnt = 1) const;
 
   int get_count (const EntityType type) const;
-  int get_army_count () const;
   int get_base_count () const;
   Vec2Int get_res_pos () const;
   std::vector<Entity> &get_vector (const EntityType type);
   const std::vector<Entity> &get_vector (const EntityType type) const;
   bool is_busy (const Entity &entity) const;
   bool is_empty_space_for_type (const Vec2Int pos, const EntityType type) const;
-  bool is_first_building_attaked (const EntityType type) const;
   bool is_place_free_or_my (const int x, const int y, const int id) const;
   bool is_place_free (const int x, const int y) const;
   bool is_place_contain (const int x, const int y, const EntityType type) const;
@@ -76,7 +66,6 @@ public:
   void get_nearest_worker_and_best_pos (const Vec2Int build_pos, const EntityType buildType, const Entity *&entity, Vec2Int &best_pos) const;
   static int get_distance (const Vec2Int pos_a, const Vec2Int pos_b);
   int get_distance_for_base (const int id_a, const Vec2Int &pos_b, const EntityType type_b, Vec2Int &best_pos) const;
-  bool get_pos_for_safe_operation (const EntityType type, Vec2Int &pos) const;
   std::vector<Vec2Int> get_nearest_free_places_for_me (const int id_a, const int id_b) const;
   std::vector<Vec2Int> get_nearest_free_places_for_me (const int id_a, const Vec2Int pos, const EntityType type) const;
   bool find_escape_way_for_workers (const EntityType type, const Vec2Int worker_pos, Vec2Int &safe_pos) const;
@@ -93,15 +82,7 @@ public:
   void move_builders ();
   void move_army (const EntityType type);
   void turn_on_turrets ();
-  void make_atack_groups ();
-  void move_solder (const Entity &entity, const Vec2Int &pos, bool need_add_task = true);
   void save_builders ();
   void heal_nearest ();
   void send_cleaners ();
-  void send_earners ();
-
-  void run_tasks ();
-  void add_repair_task (const int id, const int id_rep);
-  void add_move_task (const int id, const Vec2Int id_rep);
-  void redirect_all_atack_move_tasks (const Vec2Int old_pos, const Vec2Int new_pos);
 };

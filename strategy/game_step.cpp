@@ -1,55 +1,8 @@
 #include "game_step.hpp"
 
 
-std::unordered_map<int, int> game_step_t::repair_tasks;
-std::unordered_map<int, Vec2Int> game_step_t::attack_move_tasks;
-std::unordered_set<int> game_step_t::destroyed_pos;
 std::vector<int> game_step_t::cleaner_lvs = {0, 2};
 
-int game_step_t::choose_atack_pos (const Vec2Int old_pos)
-{
-  if (destroyed_pos.size () == attack_pos.size ())
-    destroyed_pos.clear ();
-
-  if (is_correct (old_pos))
-    {
-      int old_dir = get_id_pos_by_vec (old_pos);
-      if ((old_dir == 0 || old_dir == 2) && !destroyed_pos.count (1))
-        return 1;
-    }
-
-  if (!is_correct (old_pos) && (!destroyed_pos.count (0) || !destroyed_pos.count (2)))
-    {
-      int dir = -1;
-      do
-        {
-          dir = (rand () % 2) * 2;
-        }
-      while (destroyed_pos.count (dir));
-      return dir;
-    }
-
-  int dir = -1;
-  do
-    {
-      dir = rand () % attack_pos.size ();
-    }
-  while (destroyed_pos.count (dir));
-
-  return dir;
-}
-
-int game_step_t::get_id_pos_by_vec (const Vec2Int pos)
-{
-  int dir = -1;
-  for (int i = 0; i < attack_pos.size (); ++i)
-    if (attack_pos[i] == pos)
-      {
-        dir = i;
-        break;
-      }
-  return dir;
-}
 
 game_step_t::game_step_t (const PlayerView &_playerView, Action &_result)
   : playerView (&_playerView), result (&_result),
@@ -77,9 +30,6 @@ game_step_t::game_step_t (const PlayerView &_playerView, Action &_result)
     res[MELEE_UNIT] = {};
     res[RANGED_UNIT] = {};
     res[RESOURCE] = {};
-  }
-  {
-    attack_pos = {{playerView->mapSize - 5, 5}, {playerView->mapSize - 5, playerView->mapSize - 5}, {5, playerView->mapSize - 5}};
   }
   {
     cleaner_aims = {
@@ -320,11 +270,6 @@ int game_step_t::get_count (const EntityType type) const
   return m_entity.at (type).size ();
 }
 
-int game_step_t::get_army_count () const
-{
-  return get_count (RANGED_UNIT) + get_count (MELEE_UNIT);
-}
-
 int game_step_t::get_base_count () const
 {
   return get_count (BUILDER_BASE) + get_count (RANGED_BASE) + get_count (MELEE_BASE);
@@ -345,17 +290,6 @@ bool game_step_t::is_empty_space_for_type (const Vec2Int pos, const EntityType t
           return false;
       }
   return true;
-}
-
-bool game_step_t::is_first_building_attaked (const EntityType type) const
-{
-  if (get_count (type) == 0)
-    return true;
-  const EntityProperties &properties = playerView->entityProperties.at (type);
-  const Entity &entity = m_entity.at (type)[0];
-  if (entity.active && entity.health < properties.maxHealth)
-    return true;
-  return false;
 }
 
 bool game_step_t::is_place_free_or_my (const int x, const int y, const int id) const
@@ -438,37 +372,6 @@ int game_step_t::get_distance_for_base (const int id_a, const Vec2Int &pos_b, co
         }
     }
   return res;
-}
-
-bool game_step_t::get_pos_for_safe_operation (const EntityType type, Vec2Int &pos) const
-{
-  bool attacked = false;
-  const EntityProperties &properties = playerView->entityProperties.at (type);
-  if (get_count (type) == 0)
-    {
-      if (type == BUILDER_BASE || type == MELEE_BASE || type == RANGED_BASE)
-        {
-          pos = priority_places_for_building.at (type)[0];
-          pos.x += properties.size / 2 + rand () % properties.size;
-          pos.y += properties.size / 2 + rand () % properties.size;
-          attacked = true;
-        }
-    }
-  else
-    {
-      for (const Entity &entity : get_vector (type))
-        {
-          if (entity.active && entity.health < properties.maxHealth)
-            {
-              pos = entity.position;
-              pos.x += properties.size / 2 + rand () % properties.size;
-              pos.y += properties.size / 2 + rand () % properties.size;
-              attacked = true;
-              break;
-            }
-        }
-    }
-  return attacked;
 }
 
 void game_step_t::get_nearest_worker_and_best_pos (const Vec2Int build_pos, const EntityType buildType, const Entity *&entity, Vec2Int &best_pos) const
@@ -673,23 +576,12 @@ void game_step_t::move_army (const EntityType type)
       std::shared_ptr<AttackAction> atackAction  = std::shared_ptr<AttackAction> (new AttackAction (nullptr, std::shared_ptr<AutoAttack> (new AutoAttack (properties.sightRange, {}))));;
       std::shared_ptr<RepairAction> repairAction = nullptr;
 
-      Vec2Int pos;
-      if (   get_pos_for_safe_operation (BUILDER_BASE, pos)
-          || get_pos_for_safe_operation (RANGED_BASE , pos)
-          || get_pos_for_safe_operation (MELEE_BASE  , pos)
-          || get_pos_for_safe_operation (TURRET      , pos)
-          || get_pos_for_safe_operation (HOUSE       , pos)
-          || get_pos_for_safe_operation (WALL        , pos))
-        moveAction = std::shared_ptr<MoveAction> (new MoveAction (pos, true, false));
+      if (entity.id % 4 < 2)
+        moveAction = std::shared_ptr<MoveAction> (new MoveAction (Vec2Int (10 + rand () % 13, 10 + rand () % 13), true, false));
+      else if (entity.id % 4 == 2)
+        moveAction = std::shared_ptr<MoveAction> (new MoveAction (Vec2Int (20 + rand () % 4, 3 + rand () % 12), true, false));
       else
-        {
-          if (entity.id % 4 < 2)
-            moveAction = std::shared_ptr<MoveAction> (new MoveAction (Vec2Int (10 + rand () % 13, 10 + rand () % 13), true, false));
-          else if (entity.id % 4 == 2)
-            moveAction = std::shared_ptr<MoveAction> (new MoveAction (Vec2Int (20 + rand () % 4, 3 + rand () % 12), true, false));
-          else
-            moveAction = std::shared_ptr<MoveAction> (new MoveAction (Vec2Int (3 + rand () % 12, 20 + rand () % 4), true, false));
-        }
+        moveAction = std::shared_ptr<MoveAction> (new MoveAction (Vec2Int (3 + rand () % 12, 20 + rand () % 4), true, false));
 
       result->entityActions[entity.id] = EntityAction (moveAction, buildAction, atackAction, repairAction);
     }
@@ -709,44 +601,6 @@ void game_step_t::turn_on_turrets ()
 
       result->entityActions[entity.id] = EntityAction (moveAction, buildAction, atackAction, repairAction);
     }
-}
-
-void game_step_t::make_atack_groups ()
-{
-  if (get_army_count () - game_step_t::attack_move_tasks.size () > 12 || (!game_step_t::destroyed_pos.empty () && get_count (TURRET) >= 3))
-    {
-      int dir = choose_atack_pos ();
-      if (dir < 0)
-        return;
-      for (const Entity &entity : get_vector (RANGED_UNIT))
-        {
-          if (rand () % 20 == 0 || is_busy (entity)) // 95%
-            continue;
-          move_solder (entity, attack_pos[dir]);
-        }
-      for (const Entity &entity : get_vector (MELEE_UNIT))
-        {
-          if (rand () % 20 == 0 || is_busy (entity)) // 95%
-            continue;
-          move_solder (entity, attack_pos[dir]);
-        }
-    }
-}
-
-void game_step_t::move_solder (const Entity &entity, const Vec2Int &pos, bool need_add_task)
-{
-  const EntityProperties &properties = playerView->entityProperties.at (entity.entityType);
-
-  std::shared_ptr<MoveAction>   moveAction   = std::shared_ptr<MoveAction> (new MoveAction (pos, true, true));;
-  std::shared_ptr<BuildAction>  buildAction  = nullptr;
-  std::shared_ptr<AttackAction> atackAction  = std::shared_ptr<AttackAction> (new AttackAction (nullptr, std::shared_ptr<AutoAttack> (new AutoAttack (properties.sightRange, {}))));;
-  std::shared_ptr<RepairAction> repairAction = nullptr;
-  
-  if (need_add_task)
-    add_move_task (entity.id, pos);
-  else
-    make_busy (entity.id);
-  result->entityActions[entity.id] = EntityAction (moveAction, buildAction, atackAction, repairAction);
 }
 
 void game_step_t::send_cleaners ()
@@ -775,106 +629,6 @@ void game_step_t::send_cleaners ()
           make_busy (entity.id);
           result->entityActions[entity.id] = EntityAction (moveAction, buildAction, atackAction, repairAction);
           break;
-        }
-    }
-}
-
-void game_step_t::run_tasks ()
-{
-  std::unordered_set<int> finished;
-  for (auto &task : game_step_t::repair_tasks)
-    {
-      int id = task.first;
-      int id_rep = task.second;
-      if (!m_entity_by_id.count (id) || !m_entity_by_id.count (id_rep))
-        {
-          repair_ids[id_rep]--;
-          finished.insert (id);
-          continue;
-        }
-      const Entity &entity = m_entity_by_id[id_rep];
-      const EntityProperties &properties = playerView->entityProperties.at (entity.entityType);
-      if (entity.health >= properties.maxHealth)
-        {
-          repair_ids.erase (id_rep);
-          finished.insert (id);
-          continue;
-        }
-      repair_ids[id_rep]++;
-      make_busy (id);
-    }
-  for (const int id : finished)
-    game_step_t::repair_tasks.erase (id);
-  finished.clear ();
-
-  bool need_redirect = false;
-  Vec2Int vec_old (0,0), vec_new (0, 0);
-  for (auto &task : game_step_t::attack_move_tasks)
-    {
-      int id = task.first;
-      Vec2Int pos = task.second;
-      if (!m_entity_by_id.count (id))
-        {
-          finished.insert (id);
-          continue;
-        }
-      const Entity &entity = m_entity_by_id[id];
-      // TO-DO: cancel and go to heal by health
-      if (get_distance (entity.position, pos) <= 1)
-        {
-          int old_dir = get_id_pos_by_vec (pos);
-          destroyed_pos.insert (old_dir);
-
-          int new_dir = choose_atack_pos (pos);
-          if (new_dir == -1)
-            finished.insert (id);
-          else
-            {
-              need_redirect = true;
-              vec_old = pos;
-              vec_new = attack_pos[new_dir];
-            }
-          continue;
-        }
-      make_busy (id);
-    }
-  for (const int id : finished)
-    game_step_t::attack_move_tasks.erase (id);
-  if (need_redirect)
-    redirect_all_atack_move_tasks (vec_old, vec_new);
-}
-
-
-void game_step_t::add_repair_task (const int id, const int id_rep)
-{
-  if (repair_ids[id_rep] >= count_workers_to_repair (m_entity_by_id[id_rep].entityType))
-    return;
-  game_step_t::repair_tasks[id] = id_rep;
-  repair_ids[id_rep]++;
-  make_busy (id);
-}
-
-void game_step_t::add_move_task (const int id, const Vec2Int pos)
-{
-  game_step_t::attack_move_tasks[id] = pos;
-  make_busy (id);
-}
-
-void game_step_t::send_earners ()
-{
-  // TO-DO: send several workers anyway
-}
-
-void game_step_t::redirect_all_atack_move_tasks (const Vec2Int old_pos, const Vec2Int new_pos)
-{
-  for (auto &task : game_step_t::attack_move_tasks)
-    {
-      const int id = task.first;
-      const Vec2Int pos = task.second;
-      if (pos == old_pos)
-        {
-          move_solder (m_entity_by_id[id], new_pos, false);
-          task.second = new_pos;
         }
     }
 }
