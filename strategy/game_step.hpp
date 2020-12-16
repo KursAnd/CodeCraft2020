@@ -13,6 +13,11 @@ private:
   Action *result;
 
   std::unordered_map<EntityType, std::vector<Vec2Int>> priority_places_for_building;
+  
+  
+  static std::unordered_set<int> destroyed_pos;
+  static std::unordered_map<int, Vec2Int> attack_move_tasks;
+  std::vector<Vec2Int> attack_pos;
 
 
   static std::vector<int> cleaner_lvs;
@@ -50,6 +55,7 @@ public:
   void set_map_damage (const Entity &entity, bool add = true);
 
   int get_count (const EntityType type) const;
+  int get_army_count () const;
   int get_base_count () const;
   Vec2Int get_res_pos () const;
   std::vector<Entity> &get_vector (const EntityType type);
@@ -93,4 +99,14 @@ public:
   void save_builders ();
   void heal_nearest ();
   void send_cleaners ();
+
+
+  void run_tasks ();
+  void make_atack_groups ();
+  void add_move_task (const int id, const Vec2Int id_rep);
+  void redirect_all_atack_move_tasks (const Vec2Int old_pos, const Vec2Int new_pos);
+
+
+  int get_attack_pos_id_by_vec (const Vec2Int pos) const;
+  int choose_atack_pos (const Vec2Int old_pos = Vec2Int (-1, -1));
 };
