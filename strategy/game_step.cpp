@@ -103,32 +103,33 @@ game_step_t::game_step_t (const PlayerView &_playerView, Action &_result)
       }
 
   for (const Entity &entity : playerView->entities)
-    if (entity.playerId != nullptr)
-      {
-        if (*entity.playerId == m_id)
-          {
-            m_entity_type_by_id[entity.id] = entity.entityType;
-            m_entity_by_id[entity.id] = entity;
-            m_entity_set[entity.entityType].insert (entity.id);
-            m_entity[entity.entityType].push_back (entity);
+    {
+      m_entity_by_id[entity.id] = entity;
+      if (entity.playerId != nullptr)
+        {
+          if (*entity.playerId == m_id)
+            {
+              m_entity_type_by_id[entity.id] = entity.entityType;
+              m_entity_set[entity.entityType].insert (entity.id);
+              m_entity[entity.entityType].push_back (entity);
 
-            const EntityProperties &properties = playerView->entityProperties.at (entity.entityType);
-            if (entity.active)
-              m_population_max += properties.populationProvide;
-            m_population_max_future += properties.populationProvide;
-            m_population_use += properties.populationUse;
-          }
-        else
-          {
-            m_enemy[entity.entityType].push_back (entity);
-          }
-      }
-    else if (entity.entityType == RESOURCE)
-      {
-        if (m_res_pos.x + m_res_pos.y > entity.position.x + entity.position.y)
-          m_res_pos = entity.position;
-      }
-
+              const EntityProperties &properties = playerView->entityProperties.at (entity.entityType);
+              if (entity.active)
+                m_population_max += properties.populationProvide;
+              m_population_max_future += properties.populationProvide;
+              m_population_use += properties.populationUse;
+            }
+          else
+            {
+              m_enemy[entity.entityType].push_back (entity);
+            }
+        }
+      else if (entity.entityType == RESOURCE)
+        {
+          if (m_res_pos.x + m_res_pos.y > entity.position.x + entity.position.y)
+            m_res_pos = entity.position;
+        }
+    }
   if (m_res_pos.x == _playerView.mapSize - 1 && m_res_pos.y == _playerView.mapSize - 1)
     m_res_pos = Vec2Int (0, 0);
 
@@ -219,7 +220,8 @@ bool game_step_t::need_build (const EntityType type) const
 
       case HOUSE       :
         return (get_count (BUILDER_UNIT) >= MIN_BUILDER_UNITS || m_population_use < MIN_BUILDER_UNITS)
-            && m_population_use + 10 >= m_population_max_future;
+            && m_population_use + 10 >= m_population_max_future
+            && get_count (BUILDER_BASE) > 0;
       case TURRET      :
         return get_count (BUILDER_UNIT) >= MIN_BUILDER_UNITS
             && m_population_max > 30
