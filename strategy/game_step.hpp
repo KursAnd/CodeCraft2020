@@ -34,6 +34,7 @@ private:
   std::unordered_set<int> ids_was;
   std::vector<std::vector<int>> map;
   std::vector<std::vector<int>> map_id;
+  std::vector<std::vector<int>> map_damage;
 
   std::unordered_map<EntityType, std::vector<Entity>> m_enemy;
 
@@ -46,15 +47,21 @@ public:
   bool need_build (const EntityType type) const;
   bool can_build (const EntityType type) const;
   int entity_price (const EntityType type, const int cnt = 1) const;
+  void set_map_damage (const Entity &entity, bool add = true);
 
   int get_count (const EntityType type) const;
   int get_base_count () const;
   Vec2Int get_res_pos () const;
   std::vector<Entity> &get_vector (const EntityType type);
   const std::vector<Entity> &get_vector (const EntityType type) const;
+  std::vector<Entity> &get_enemy_vector (const EntityType type);
+  const std::vector<Entity> &get_enemy_vector (const EntityType type) const;
+  
+  bool is_busy (const int id) const;
   bool is_busy (const Entity &entity) const;
   bool is_empty_space_for_type (const Vec2Int pos, const EntityType type) const;
   bool is_place_free_or_my (const int x, const int y, const int id) const;
+  bool is_place_free (const Vec2Int pos) const;
   bool is_place_free (const int x, const int y) const;
   bool is_place_contain (const int x, const int y, const EntityType type) const;
   bool is_place_contain_enemy (const int x, const int y, const EntityType type) const;
@@ -80,6 +87,7 @@ public:
   void train_unit (const EntityType factoryType);
   void check_repair (const EntityType repairType);
   void move_builders ();
+  void move_archers ();
   void move_army (const EntityType type);
   void turn_on_turrets ();
   void save_builders ();

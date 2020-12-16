@@ -15,10 +15,8 @@ void strategy_1 (const PlayerView& playerView, DebugInterface* debugInterface, A
   gs.save_builders ();
   gs.heal_nearest ();
   gs.send_cleaners ();
-  gs.send_earners ();
 
   gs.check_repair (BUILDER_BASE);
-  gs.check_repair (MELEE_BASE);
   gs.check_repair (RANGED_BASE);
   gs.check_repair (TURRET);
   gs.check_repair (HOUSE);
@@ -26,17 +24,14 @@ void strategy_1 (const PlayerView& playerView, DebugInterface* debugInterface, A
   
   gs.train_unit (BUILDER_BASE);
   gs.train_unit (RANGED_BASE);
-  //gs.train_unit (MELEE_BASE);
 
   gs.try_build (BUILDER_BASE);
-  //gs.try_build (MELEE_BASE);
   gs.try_build (RANGED_BASE);
   gs.try_build (HOUSE);
   gs.try_build (TURRET);
   gs.try_build (WALL);
   
   gs.move_archers ();
-  
   gs.move_builders ();
   gs.move_army (RANGED_UNIT);
   gs.move_army (MELEE_UNIT);

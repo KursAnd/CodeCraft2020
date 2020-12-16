@@ -80,14 +80,23 @@ game_step_t::game_step_t (const PlayerView &_playerView, Action &_result)
     }
   if (m_res_pos.x == _playerView.mapSize - 1 && m_res_pos.y == _playerView.mapSize - 1)
     m_res_pos = Vec2Int (0, 0);
+  if (get_count (MELEE_UNIT) > 0)
+    {
+      std::shared_ptr<MoveAction>   moveAction   = std::shared_ptr<MoveAction> (new MoveAction (Vec2Int (5, playerView->mapSize - 6), true, false));
+      std::shared_ptr<AttackAction> atackAction  = std::shared_ptr<AttackAction> (new AttackAction (nullptr, std::shared_ptr<AutoAttack> (new AutoAttack (playerView->entityProperties.at (MELEE_UNIT).sightRange, {}))));;
+      result->entityActions[m_entity[MELEE_UNIT][0].id] = EntityAction (moveAction, nullptr, atackAction, nullptr);
+      make_busy (m_entity[MELEE_UNIT][0].id);
+    }
 
   const int custom_value = (playerView->fogOfWar ? 100 : 0);
   map = std::vector<std::vector<int>> (playerView->mapSize);
   map_id = std::vector<std::vector<int>> (playerView->mapSize);
+  map_damage = std::vector<std::vector<int>> (playerView->mapSize);
   for (int i = 0; i < playerView->mapSize; ++i)
     {
       map[i] = std::vector<int> (playerView->mapSize, custom_value);
       map_id[i] = std::vector<int> (playerView->mapSize, -1);
+      map_damage[i] = std::vector<int> (playerView->mapSize, 0);
     }
   if (playerView->fogOfWar)
     {
@@ -136,6 +145,9 @@ game_step_t::game_step_t (const PlayerView &_playerView, Action &_result)
             map_id[x][y] = entity.id;
           }
     }
+  for (const EntityType type : {/*BUILDER_UNIT, */MELEE_UNIT, RANGED_UNIT, TURRET})
+    for (const Entity &entity : get_enemy_vector (type))
+      set_map_damage (entity);
 }
 
 Vec2Int game_step_t::get_place_for (const EntityType type) const
@@ -158,13 +170,9 @@ bool game_step_t::need_build (const EntityType type) const
   switch (type)
     {
       case BUILDER_UNIT: return get_count (BUILDER_UNIT) < std::max (MIN_BUILDER_UNITS, m_population_max * 4 / 10)
-                             || (get_count (BUILDER_UNIT) < MIN_BUILDER_UNITS * 2 && !can_build (RANGED_UNIT) && !can_build (MELEE_UNIT));
+                             || (get_count (BUILDER_UNIT) < MIN_BUILDER_UNITS * 2 && !can_build (RANGED_UNIT));
       case RANGED_UNIT : return get_count (BUILDER_UNIT) >= MIN_BUILDER_UNITS;
-      case MELEE_UNIT  : return get_count (BUILDER_UNIT) >= MIN_BUILDER_UNITS
-                             && (   (m_population_use <  40                          && get_count (MELEE_UNIT)     < get_count (RANGED_UNIT)    )
-                                 || (m_population_use >= 40 && m_population_use < 80 && get_count (MELEE_UNIT) * 3 < get_count (RANGED_UNIT) * 2)
-                                 || (m_population_max >= 80                          && get_count (MELEE_UNIT)     < get_count (RANGED_UNIT) * 2)
-                                 || !can_build (RANGED_UNIT));
+      case MELEE_UNIT  : return false;
 
       case HOUSE       :
         return (get_count (BUILDER_UNIT) >= MIN_BUILDER_UNITS || m_population_use < MIN_BUILDER_UNITS)
@@ -228,6 +236,36 @@ int game_step_t::entity_price (const EntityType type, const int cnt) const
   return price;
 }
 
+void game_step_t::set_map_damage (const Entity &entity, bool add)
+{
+  const EntityProperties &p = playerView->entityProperties.at (entity.entityType);
+
+  for (int x = std::max (0, entity.position.x - p.attack->attackRange); x < std::min (playerView->mapSize - 1, entity.position.x + p.size + p.attack->attackRange); ++x)
+    for (int y = entity.position.y; y < entity.position.y + p.size; ++y)
+      map_damage[x][y] += add ? p.attack->damage : -p.attack->damage;
+  for (int x = entity.position.x; x < entity.position.x + p.size; ++x)
+    {
+      for (int y = std::max (0, entity.position.y - p.attack->attackRange); y < entity.position.y; ++y)
+        map_damage[x][y] += add ? p.attack->damage : -p.attack->damage;
+      for (int y = entity.position.y + p.size; y < std::min (playerView->mapSize - 1, entity.position.y + p.size + p.attack->attackRange); ++y)
+        map_damage[x][y] += add ? p.attack->damage : -p.attack->damage;
+    }
+  for (int k = 1, x = entity.position.x + p.size; x < std::min (playerView->mapSize - 1, entity.position.x + p.size + p.attack->attackRange - 1); ++x, ++k)
+    {
+      for (int y = entity.position.y - 1; y >= std::max (0, entity.position.y - p.attack->attackRange + k); --y)
+        map_damage[x][y] += add ? p.attack->damage : -p.attack->damage;
+      for (int y = entity.position.y + p.size; y < std::min (playerView->mapSize - 1, entity.position.y + p.size + p.attack->attackRange - k); ++y)
+        map_damage[x][y] += add ? p.attack->damage : -p.attack->damage;
+    }
+  for (int k = 1, x = entity.position.x - 1; x >= std::max (0, entity.position.x - p.attack->attackRange + 1); --x, ++k)
+    {
+      for (int y = entity.position.y - 1; y >= std::max (0, entity.position.y - p.attack->attackRange + k); --y)
+        map_damage[x][y] += add ? p.attack->damage : -p.attack->damage;
+      for (int y = entity.position.y + p.size; y < std::min (playerView->mapSize - 1, entity.position.y + p.size + p.attack->attackRange - k); ++y)
+        map_damage[x][y] += add ? p.attack->damage : -p.attack->damage;
+    }
+}
+
 bool game_step_t::buy_entity (const EntityType type, const int cnt)
 {
   int price = entity_price (type, cnt);
@@ -263,6 +301,17 @@ const std::vector<Entity> &game_step_t::get_vector (const EntityType type) const
   return m_entity.at (type);
 }
 
+std::vector<Entity> &game_step_t::get_enemy_vector (const EntityType type)
+{
+  return m_enemy[type];
+}
+
+const std::vector<Entity> &game_step_t::get_enemy_vector (const EntityType type) const
+{
+  // safe becàuse of hack in game_step_t::game_step_t
+  return m_enemy.at (type);
+}
+
 int game_step_t::get_count (const EntityType type) const
 {
   if (!m_entity.count (type))
@@ -273,6 +322,11 @@ int game_step_t::get_count (const EntityType type) const
 int game_step_t::get_base_count () const
 {
   return get_count (BUILDER_BASE) + get_count (RANGED_BASE) + get_count (MELEE_BASE);
+}
+
+bool game_step_t::is_busy (const int id) const
+{
+  return ids_was.count (id);;
 }
 
 bool game_step_t::is_busy (const Entity &entity) const
@@ -297,9 +351,14 @@ bool game_step_t::is_place_free_or_my (const int x, const int y, const int id) c
   return is_place_free (x, y) || map_id.at (x).at (y) == id;
 }
 
+bool game_step_t::is_place_free (const Vec2Int pos) const
+{
+  return is_correct (pos) &&  map.at (pos.x).at (pos.y) == 0;
+}
+
 bool game_step_t::is_place_free (const int x, const int y) const
 {
-  return map.at (x).at (y) == 0;
+  return is_correct_xy (x, y) &&  map.at (x).at (y) == 0;
 }
 
 bool game_step_t::is_place_contain (const int x, const int y, const EntityType type) const
@@ -562,6 +621,196 @@ void game_step_t::move_builders ()
     }
 }
 
+void game_step_t::move_archers ()
+{
+  const EntityType type = RANGED_UNIT;
+  const EntityProperties &prop = playerView->entityProperties.at (type);
+  
+  /////////////////////////////////////////////////////
+  //          KILL RANGED_UNIT IF CAN            ////
+  std::unordered_map<int, std::unordered_set<int>> arch_aims; // enemy_arch_id -> our_arch_ids   who  can attack
+  std::unordered_map<int, std::unordered_set<int>> arch_vict; // our_arch_id   -> enemy_arch_ids whom can attack
+  for (const Entity &arch : get_vector (type))
+    {
+      for (const Entity &enemy_arch : get_enemy_vector (type))
+        {
+          if (get_distance (arch.position, enemy_arch.position) <= prop.attack->attackRange)
+            {
+              arch_aims[enemy_arch.id].insert (arch.id);
+              arch_vict[arch.id].insert (enemy_arch.id);
+            }
+        }
+    }
+  
+  for (auto it = arch_aims.begin (); it != arch_aims.end ();)
+    {
+      const int enemy_id = it->first;
+      auto &our_archs = it->second;
+      if (our_archs.size () * prop.attack->damage < m_entity_by_id[enemy_id].health)
+        {
+          if (our_archs.empty ())
+            {
+              arch_aims.erase (it);
+              it = arch_aims.begin ();
+            }
+          else
+            ++it;
+          continue;
+        }
+      while (m_entity_by_id[enemy_id].health > 0)
+        {
+          const int arch_id = *our_archs.begin ();
+          for (const int enemy_id_ : arch_vict[arch_id])
+            arch_aims[enemy_id_].erase (arch_id);
+  
+          std::shared_ptr<AttackAction> atackAction  = std::shared_ptr<AttackAction> (new AttackAction (std::shared_ptr<int> (new int (enemy_id)), nullptr));
+          result->entityActions[arch_id] = EntityAction (nullptr, nullptr, atackAction, nullptr);
+          make_busy (arch_id);
+          m_entity_by_id[enemy_id].health -= prop.attack->damage;
+        }
+      set_map_damage (m_entity_by_id[enemy_id], false);
+      arch_aims.erase (it);
+      it = arch_aims.begin ();
+    }
+  ////          KILL RANGED_UNIT IF CAN            ////
+  /////////////////////////////////////////////////////
+
+  ////////////////////////////////////////////////////
+  ////          KILL MELEE_UNIT IF CAN            ////
+  std::unordered_map<int, std::unordered_set<int>> melee_aims; // enemy_id -> our_ids   who  can attack
+  std::unordered_map<int, std::unordered_set<int>> melee_vict; // our_id   -> enemy_ids whom can attack
+  const EntityType enemy_type = MELEE_UNIT;
+  const EntityProperties &enemy_prop = playerView->entityProperties.at (enemy_type);
+  for (const Entity &arch : get_vector (type))
+    {
+      if (is_busy (arch))
+        continue;
+      for (const Entity &enemy : get_enemy_vector (enemy_type))
+        {
+          if (get_distance (arch.position, enemy.position) <= prop.attack->attackRange)
+            {
+              melee_aims[enemy.id].insert (arch.id);
+              melee_vict[arch.id].insert (enemy.id);
+            }
+        }
+    }
+
+  for (auto it = melee_aims.begin (); it != melee_aims.end ();)
+    {
+      const int enemy_id = it->first;
+      auto &our_archs = it->second;
+      if (our_archs.size () * prop.attack->damage < m_entity_by_id[enemy_id].health)
+        {
+          if (our_archs.empty ())
+            {
+              melee_aims.erase (it);
+              it = melee_aims.begin ();
+            }
+          else
+            ++it;
+          continue;
+        }
+      while (m_entity_by_id[enemy_id].health > 0)
+        {
+          const int arch_id = *our_archs.begin ();
+          for (const int enemy_id_ : melee_vict[arch_id])
+            melee_aims[enemy_id_].erase (arch_id);
+
+          std::shared_ptr<AttackAction> atackAction  = std::shared_ptr<AttackAction> (new AttackAction (std::shared_ptr<int> (new int (enemy_id)), nullptr));
+          result->entityActions[arch_id] = EntityAction (nullptr, nullptr, atackAction, nullptr);
+          make_busy (arch_id);
+          m_entity_by_id[enemy_id].health -= prop.attack->damage;
+        }
+      set_map_damage (m_entity_by_id[enemy_id], false);
+      melee_aims.erase (it);
+      it = melee_aims.begin ();
+    }
+  ////          KILL MELEE_UNIT IF CAN            ////
+  ////////////////////////////////////////////////////
+
+  //////////////////////////////////////////////////////////////
+  ////          RUN AWAY FROM RANGED_UNIT IF CAN            ////
+  for (auto &it : arch_vict)
+    {
+      const int arch_id = it.first;
+      if (is_busy (arch_id))
+        continue;
+      auto &enemy_ids = it.second;
+      const Entity &arch  = m_entity_by_id[arch_id];
+
+      std::vector<Vec2Int> near_poses = {Vec2Int (arch.position.x    , arch.position.y - 1), Vec2Int (arch.position.x - 1, arch.position.y    ),
+                                         Vec2Int (arch.position.x + 1, arch.position.y    ), Vec2Int (arch.position.x    , arch.position.y + 1)};
+      Vec2Int best_pos = INCORRECT_VEC2INT;
+      if (arch.health > prop.attack->damage * enemy_ids.size ())
+        {
+          for (const Vec2Int pos : near_poses)
+            if (is_place_free (pos) && map_damage[pos.x][pos.y] == 0)
+              {              
+                best_pos = pos;
+                break;
+              }
+        }
+
+      std::shared_ptr<MoveAction>   moveAction   = nullptr;
+      std::shared_ptr<AttackAction> atackAction  = nullptr;
+      if (best_pos.x != -1)
+        {
+          moveAction = std::shared_ptr<MoveAction> (new MoveAction (best_pos, true, false));
+          map[best_pos.x][best_pos.y] = RANGED_UNIT + 10;
+        }
+      else
+        {
+          atackAction  = std::shared_ptr<AttackAction> (new AttackAction (std::shared_ptr<int> (new int (*enemy_ids.begin ())), nullptr));
+          m_entity_by_id[*enemy_ids.begin ()].health -= prop.attack->damage;
+        }
+      result->entityActions[arch_id] = EntityAction (moveAction, nullptr, atackAction, nullptr);
+      make_busy (arch_id);
+    }
+  ////          RUN AWAY FROM RANGED_UNIT IF CAN            ////
+  //////////////////////////////////////////////////////////////
+  
+  ///////////////////////////////////////////////////////////
+  ////          RUN AWAY FROM EVERYONE IF CAN            ////
+  for (const Entity &arch : get_vector (type))
+    {
+      if (map_damage[arch.position.x][arch.position.y] != 0)
+        continue;
+
+      auto is_safe_area = [&] (const Vec2Int pos)
+        {
+          std::vector<Vec2Int> poses = {Vec2Int (pos.x    , pos.y - 1), Vec2Int (pos.x - 1, pos.y    ),
+                                        Vec2Int (pos.x + 1, pos.y    ), Vec2Int (pos.x    , pos.y + 1)};
+          for (const Vec2Int p : poses)
+            if (is_correct (p) && map_damage[p.x][p.y] > 0)
+              return false;
+          return true;
+        };
+      if (!is_safe_area (arch.position))
+        {
+          Vec2Int best_pos = INCORRECT_VEC2INT;
+          std::vector<Vec2Int> poses = {Vec2Int (arch.position.x    , arch.position.y - 1), Vec2Int (arch.position.x - 1, arch.position.y    ),
+                                        Vec2Int (arch.position.x + 1, arch.position.y    ), Vec2Int (arch.position.x    , arch.position.y + 1)};
+          for (const Vec2Int p : poses)
+            {
+              if (is_correct (p) && is_safe_area (p))
+                {
+                  best_pos = p;
+                  break;
+                }
+            }
+          if (best_pos.x != -1)
+            {
+              std::shared_ptr<MoveAction>   moveAction   = std::shared_ptr<MoveAction> (new MoveAction (best_pos, true, false));
+              result->entityActions[arch.id] = EntityAction (moveAction, nullptr, nullptr, nullptr);
+              make_busy (arch.id);
+              map[best_pos.x][best_pos.y] = RANGED_UNIT + 10;
+            }
+        }
+    }
+  ////          RUN AWAY FROM EVERYONE IF CAN            ////
+  ///////////////////////////////////////////////////////////
+}
+
 void game_step_t::move_army (const EntityType type)
 {
   const EntityProperties &properties = playerView->entityProperties.at (type);
@@ -747,15 +996,15 @@ bool game_step_t::find_escape_way_for_workers (const EntityType type, const Vec2
     {
       if (escape[l])
         {
-          if (is_correct (near_pos[l]) && is_place_free (near_pos[l].x, near_pos[l].y))
+          if (is_place_free (near_pos[l].x, near_pos[l].y))
             {
               ways.push_back (near_pos[l]);
             }
           else if (ways.empty () && bad_way.empty ())
             {
-              if (!escape[u] && is_correct (near_pos[d]) && is_place_free (near_pos[d].x, near_pos[d].y))
+              if (!escape[u] && is_place_free (near_pos[d].x, near_pos[d].y))
                 bad_way.push_back (near_pos[d]);
-              else if (!escape[d] && is_correct (near_pos[u]) && is_place_free (near_pos[u].x, near_pos[u].y))
+              else if (!escape[d] && is_place_free (near_pos[u].x, near_pos[u].y))
                 bad_way.push_back (near_pos[u]);
             } 
         }
