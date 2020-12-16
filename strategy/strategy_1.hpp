@@ -14,6 +14,7 @@ void strategy_1 (const PlayerView& playerView, DebugInterface* debugInterface, A
 
   gs.run_tasks ();
   gs.save_builders ();
+  gs.heal_nearest ();
   gs.send_cleaners ();
   gs.send_earners ();
 

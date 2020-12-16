@@ -885,11 +885,14 @@ void game_step_t::save_builders ()
 
   for (const Entity &entity : get_vector (type))
     {
+      if (is_busy (entity))
+        continue;
+
       Vec2Int safe_pos = INCORRECT_VEC2INT;
       if (   find_escape_way_for_workers (RANGED_UNIT, entity.position, safe_pos)
           || find_escape_way_for_workers (MELEE_UNIT , entity.position, safe_pos))
         {
-          std::shared_ptr<MoveAction>   moveAction   = std::shared_ptr<MoveAction> (new MoveAction (safe_pos, true, true));;
+          std::shared_ptr<MoveAction>   moveAction   = std::shared_ptr<MoveAction> (new MoveAction (safe_pos, true, true));
           std::shared_ptr<BuildAction>  buildAction  = nullptr;
           std::shared_ptr<AttackAction> atackAction  = nullptr;
           std::shared_ptr<RepairAction> repairAction = nullptr;
@@ -899,6 +902,65 @@ void game_step_t::save_builders ()
           // map_id[best_pos.x][best_pos.y] = entity->id; // TO-DO: I'm not sure in it
           result->entityActions[entity.id] = EntityAction (moveAction, buildAction, atackAction, repairAction);
         }
+    }
+}
+
+void game_step_t::heal_nearest ()
+{
+  const EntityType healer_type = BUILDER_UNIT;
+
+  for (const Entity &healer : get_vector (healer_type))
+    {
+      if (is_busy (healer))
+        continue;
+
+      for (const Vec2Int repair_pos : {Vec2Int (healer.position.x + 1, healer.position.y    ),
+                                       Vec2Int (healer.position.x    , healer.position.y + 1),
+                                       Vec2Int (healer.position.x - 1, healer.position.y    ),
+                                       Vec2Int (healer.position.x    , healer.position.y - 1)})
+        {
+          if (!is_correct (repair_pos))
+            continue;
+          const int repair_id = map_id[repair_pos.x][repair_pos.y];
+          if (repair_id < 0)
+            continue;
+          const Entity &repair_entity = m_entity_by_id.at (repair_id);
+          if (   (repair_entity.playerId == nullptr || *repair_entity.playerId != m_id)
+              || (repair_entity.entityType != RANGED_UNIT && repair_entity.entityType != MELEE_UNIT && repair_entity.entityType != BUILDER_UNIT))
+            continue;
+          const EntityProperties &p = playerView->entityProperties.at (repair_entity.entityType);
+          if (repair_entity.health < p.maxHealth)
+            {
+              std::shared_ptr<MoveAction>   moveAction   = nullptr;
+              std::shared_ptr<BuildAction>  buildAction  = nullptr;
+              std::shared_ptr<AttackAction> atackAction  = nullptr;
+              std::shared_ptr<RepairAction> repairAction = std::shared_ptr<RepairAction> (new RepairAction (repair_entity.id));;
+
+              make_busy (healer.id);
+              result->entityActions[healer.id] = EntityAction (moveAction, buildAction, atackAction, repairAction);
+              break;
+            }
+        }
+      //for (const EntityType repair_type : {RANGED_UNIT, MELEE_UNIT, BUILDER_UNIT})
+      //  {
+      //    const EntityProperties &p = playerView->entityProperties.at (repair_type);
+      //    for (const Entity &repair_entity : get_vector (repair_type))
+      //      {
+      //        if (repair_entity.health < p.maxHealth && get_distance (healer.position, repair_entity.position) == 1)
+      //          {
+      //            std::shared_ptr<MoveAction>   moveAction   = nullptr;
+      //            std::shared_ptr<BuildAction>  buildAction  = nullptr;
+      //            std::shared_ptr<AttackAction> atackAction  = nullptr;
+      //            std::shared_ptr<RepairAction> repairAction = std::shared_ptr<RepairAction> (new RepairAction (repair_entity.id));;
+
+      //            make_busy (healer.id);
+      //            result->entityActions[healer.id] = EntityAction (moveAction, buildAction, atackAction, repairAction);
+      //            break;
+      //          }
+      //      }
+      //    if (is_busy (healer))
+      //      break;
+      //  }
     }
 }
 

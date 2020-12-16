@@ -98,6 +98,7 @@ public:
   void make_atack_groups ();
   void move_solder (const Entity &entity, const Vec2Int &pos, bool need_add_task = true);
   void save_builders ();
+  void heal_nearest ();
   void send_cleaners ();
   void send_earners ();
 
