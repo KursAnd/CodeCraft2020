@@ -392,6 +392,7 @@ int game_step_t::get_distance (const Vec2Int pos_a, const Vec2Int pos_b)
   return std::abs (pos_a.x - pos_b.x) + std::abs (pos_a.y - pos_b.y);
 }
 
+// only TURRETS support optimized
 int game_step_t::get_build_distance (const int id /*build*/, const Vec2Int pos_b) const
 {
   const Entity &build = m_entity_by_id.at (id);
@@ -403,6 +404,41 @@ int game_step_t::get_build_distance (const int id /*build*/, const Vec2Int pos_b
         dist = std::min (dist, get_distance (Vec2Int (x, y), pos_b));
       }
   return dist;
+}
+
+// only TURRETS support optimized
+int game_step_t::get_build_to_build_distance (const Entity &a, const Entity &b) const
+{
+  const EntityProperties &prop_a = playerView->entityProperties.at (a.entityType);
+  const EntityProperties &prop_b = playerView->entityProperties.at (b.entityType);
+  int dist = get_max_distance ();
+  for (int x = a.position.x; x < a.position.x + prop_a.size; ++x)
+    for (int y = a.position.y; y < a.position.y + prop_b.size; ++y)
+      {
+        for (int q = a.position.x; q < a.position.x + prop_a.size; ++q)
+          for (int p = a.position.y; p < a.position.y + prop_b.size; ++p)
+            dist = std::min (dist, get_distance (Vec2Int (x, y), Vec2Int (q, p)));
+      }
+  return dist;
+}
+
+// only TURRETS support
+int game_step_t::get_distance (const Entity &a, const Entity &b) const
+{
+  if (a.entityType == TURRET)
+    {
+      if (b.entityType == TURRET)
+        return get_build_to_build_distance (a, b);
+      else
+        return get_build_distance (a.id, b.position);
+    }
+  else
+    {
+      if (b.entityType == TURRET)
+        return get_build_distance (b.id, a.position);
+      else
+        return get_distance (a.position, b.position);
+    }
 }
 
 bool game_step_t::is_correct (const Vec2Int pos) const
@@ -674,256 +710,109 @@ void game_step_t::move_builders ()
     }
 }
 
+void game_step_t::attack_in_zone ()
+{
+  std::unordered_map<int, int> enemy_hurt; // max damage
+  std::unordered_map<int, std::unordered_set<int>> enemy_to_us; // enemy_id -> our_ids   who  can attack
+  std::unordered_map<int, std::unordered_set<int>> we_to_enemy; // our_id   -> enemy_ids whom can attack
+  for (const EntityType type : {RANGED_UNIT, MELEE_UNIT, TURRET})
+    {
+      const EntityProperties &prop = playerView->entityProperties.at (type);
+      for (const EntityType enemy_type : {RANGED_UNIT, MELEE_UNIT, TURRET})
+        {
+          const EntityProperties &enemy_prop = playerView->entityProperties.at (enemy_type);
+          for (const Entity &entity : get_vector (type))
+            {
+              if (is_busy (entity))
+                continue;
+              for (const Entity &enemy : get_enemy_vector (enemy_type))
+                {
+                  if (enemy.health <= 0 || !entity.active || get_distance (entity, enemy) > prop.attack->attackRange)
+                    continue;
+                  enemy_hurt[enemy.id] += prop.attack->damage;
+                  enemy_to_us[enemy.id].insert (entity.id);
+                  we_to_enemy[entity.id].insert (enemy.id);
+                }
+            }
+        }
+    }
+
+  // KILL EVERYONE WHOM CAN
+  for (auto it = enemy_to_us.begin (); it != enemy_to_us.end ();)
+    {
+      const int enemy_id = it->first;
+      std::unordered_set<int> &our_ids = it->second;
+      Entity &enemy = m_entity_by_id[enemy_id];
+      if (enemy_hurt[enemy_id] < enemy.health)
+        {
+          if (our_ids.empty ())
+            {
+              enemy_to_us.erase (it);
+              it = enemy_to_us.begin ();
+            }
+          else
+            ++it;
+          continue;
+        }
+      while (enemy.health > 0)
+        {
+          const int id = *our_ids.begin ();
+          const Entity &entity = m_entity_by_id.at (id);
+          const EntityProperties &prop = playerView->entityProperties.at (entity.entityType);
+          for (const int enemy_id_ : we_to_enemy[id])
+            {
+              enemy_to_us[enemy_id_].erase (id);
+              enemy_hurt[enemy_id_] -= prop.attack->damage;
+            }
+  
+          std::shared_ptr<AttackAction> atackAction  = std::shared_ptr<AttackAction> (new AttackAction (std::shared_ptr<int> (new int (enemy_id)), nullptr));
+          result->entityActions[id] = EntityAction (nullptr, nullptr, atackAction, nullptr);
+          make_busy (id);
+          enemy.health -= prop.attack->damage;
+        }
+      set_map_damage (enemy, false);
+      enemy_to_us.erase (it);
+      it = enemy_to_us.begin ();
+    }
+
+  // HURT OTHERS
+  for (const EntityType enemy_type : {RANGED_UNIT, MELEE_UNIT, TURRET})
+    {
+      for (auto it = enemy_to_us.begin (); it != enemy_to_us.end (); ++it)
+        {
+          const int enemy_id = it->first;
+          Entity &enemy = m_entity_by_id[enemy_id];
+          if (enemy.health <= 0)
+            {
+              int ERROR = 5;
+              int y = 5;
+              int u = 7 / (ERROR - u);
+            }
+          if (enemy.entityType != enemy_type)
+            continue;
+          std::unordered_set<int> &our_ids = it->second;
+          if (our_ids.empty ())
+            {
+              int ERROR = 5;
+              int y = 5;
+              int u = 7 / (ERROR - u);
+            }
+          for (const int id : our_ids)
+            {
+              std::shared_ptr<AttackAction> atackAction  = std::shared_ptr<AttackAction> (new AttackAction (std::shared_ptr<int> (new int (enemy_id)), nullptr));
+              result->entityActions[id] = EntityAction (nullptr, nullptr, atackAction, nullptr);
+              make_busy (id);
+              enemy.health -= 5; //prop.attack->damage;
+            }
+        }
+    }
+}
+
 void game_step_t::move_archers ()
 {
-  {
-    ///////////////////////////////////////////////
-    ////          HELP OF MELEE_UNIT           ////
-    const EntityType type = MELEE_UNIT;
-    const EntityProperties &prop = playerView->entityProperties.at (type);
-    for (const Entity &melee : get_vector (type))
-      {
-        if (is_busy (melee))
-          continue;
-        EntityType enemy_type = RANGED_UNIT;
-        for (Entity &enemy : get_enemy_vector (enemy_type))
-          {
-            if (enemy.health > 0 && get_distance (melee.position, enemy.position) <= prop.attack->attackRange)
-              {
-                std::shared_ptr<AttackAction> atackAction  = std::shared_ptr<AttackAction> (new AttackAction (std::shared_ptr<int> (new int (enemy.id)), nullptr));
-                result->entityActions[melee.id] = EntityAction (nullptr, nullptr, atackAction, nullptr);
-                make_busy (melee.id);
-                enemy.health -= prop.attack->damage;
-                if (enemy.health <= 0)
-                  set_map_damage (enemy, false);
-              }
-          }
-          
-        if (is_busy (melee))
-          continue;
-        enemy_type = MELEE_UNIT;
-        for (Entity &enemy : get_enemy_vector (enemy_type))
-          {
-            if (enemy.health > 0 && get_distance (melee.position, enemy.position) <= prop.attack->attackRange)
-              {
-                std::shared_ptr<AttackAction> atackAction  = std::shared_ptr<AttackAction> (new AttackAction (std::shared_ptr<int> (new int (enemy.id)), nullptr));
-                result->entityActions[melee.id] = EntityAction (nullptr, nullptr, atackAction, nullptr);
-                make_busy (melee.id);
-                enemy.health -= prop.attack->damage;
-                if (enemy.health <= 0)
-                  set_map_damage (enemy, false);
-              }
-          }
-          
-        if (is_busy (melee))
-          continue;
-        enemy_type = TURRET;
-        for (Entity &enemy : get_enemy_vector (enemy_type))
-          {
-            if (enemy.health > 0 && get_build_distance (enemy.id, melee.position) <= prop.attack->attackRange)
-              {
-                std::shared_ptr<AttackAction> atackAction  = std::shared_ptr<AttackAction> (new AttackAction (std::shared_ptr<int> (new int (enemy.id)), nullptr));
-                result->entityActions[melee.id] = EntityAction (nullptr, nullptr, atackAction, nullptr);
-                make_busy (melee.id);
-                enemy.health -= prop.attack->damage;
-                if (enemy.health <= 0)
-                  set_map_damage (enemy, false);
-              }
-          }
-      }
-    ////          HELP OF MELEE_UNIT           ////
-    ///////////////////////////////////////////////
-  }
-  {
-    ////////////////////////////////////////////
-    ////          HELP OF TURRETS           ////
-    const EntityType type = TURRET;
-    const EntityProperties &prop = playerView->entityProperties.at (type);
-    for (const Entity &turret : get_vector (type))
-      {
-        if (is_busy (turret))
-          continue;
-        EntityType enemy_type = RANGED_UNIT;
-        for (Entity &enemy : get_enemy_vector (enemy_type))
-          {
-            if (enemy.health > 0 && get_build_distance (turret.id, enemy.position) <= prop.attack->attackRange)
-              {
-                std::shared_ptr<AttackAction> atackAction  = std::shared_ptr<AttackAction> (new AttackAction (std::shared_ptr<int> (new int (enemy.id)), nullptr));
-                result->entityActions[turret.id] = EntityAction (nullptr, nullptr, atackAction, nullptr);
-                make_busy (turret.id);
-                enemy.health -= prop.attack->damage;
-                if (enemy.health <= 0)
-                  set_map_damage (enemy, false);
-              }
-          }
-          
-        if (is_busy (turret))
-          continue;
-        enemy_type = MELEE_UNIT;
-        for (Entity &enemy : get_enemy_vector (enemy_type))
-          {
-            if (enemy.health > 0 && get_build_distance (turret.id, enemy.position) <= prop.attack->attackRange)
-              {
-                std::shared_ptr<AttackAction> atackAction  = std::shared_ptr<AttackAction> (new AttackAction (std::shared_ptr<int> (new int (enemy.id)), nullptr));
-                result->entityActions[turret.id] = EntityAction (nullptr, nullptr, atackAction, nullptr);
-                make_busy (turret.id);
-                enemy.health -= prop.attack->damage;
-                if (enemy.health <= 0)
-                  set_map_damage (enemy, false);
-              }
-          }
-          
-        if (is_busy (turret))
-          continue;
-        enemy_type = TURRET;
-        for (Entity &enemy : get_enemy_vector (enemy_type))
-          {
-            if (enemy.health > 0 && get_build_distance (turret.id, enemy.position) <= prop.attack->attackRange)
-              {
-                std::shared_ptr<AttackAction> atackAction  = std::shared_ptr<AttackAction> (new AttackAction (std::shared_ptr<int> (new int (enemy.id)), nullptr));
-                result->entityActions[turret.id] = EntityAction (nullptr, nullptr, atackAction, nullptr);
-                make_busy (turret.id);
-                enemy.health -= prop.attack->damage;
-                if (enemy.health <= 0)
-                  set_map_damage (enemy, false);
-              }
-          }
-      }
-    ////          HELP OF TURRETS           ////
-    ////////////////////////////////////////////
-  }
-
-
-
   const EntityType type = RANGED_UNIT;
   const EntityProperties &prop = playerView->entityProperties.at (type);
-  
-  /////////////////////////////////////////////////////
-  //          KILL RANGED_UNIT IF CAN            ////
-  std::unordered_map<int, std::unordered_set<int>> arch_aims; // enemy_arch_id -> our_arch_ids   who  can attack
-  std::unordered_map<int, std::unordered_set<int>> arch_vict; // our_arch_id   -> enemy_arch_ids whom can attack
-  for (const Entity &arch : get_vector (type))
-    {
-      if (is_busy (arch))
-        continue;
-      for (const Entity &enemy : get_enemy_vector (type))
-        {
-          if (enemy.health > 0 && get_distance (arch.position, enemy.position) <= prop.attack->attackRange)
-            {
-              arch_aims[enemy.id].insert (arch.id);
-              arch_vict[arch.id].insert (enemy.id);
-            }
-        }
-    }
-  
-  for (auto it = arch_aims.begin (); it != arch_aims.end ();)
-    {
-      const int enemy_id = it->first;
-      auto &our_archs = it->second;
-      if (our_archs.size () * prop.attack->damage < m_entity_by_id[enemy_id].health)
-        {
-          if (our_archs.empty ())
-            {
-              arch_aims.erase (it);
-              it = arch_aims.begin ();
-            }
-          else
-            ++it;
-          continue;
-        }
-      while (m_entity_by_id[enemy_id].health > 0)
-        {
-          const int arch_id = *our_archs.begin ();
-          for (const int enemy_id_ : arch_vict[arch_id])
-            arch_aims[enemy_id_].erase (arch_id);
-  
-          std::shared_ptr<AttackAction> atackAction  = std::shared_ptr<AttackAction> (new AttackAction (std::shared_ptr<int> (new int (enemy_id)), nullptr));
-          result->entityActions[arch_id] = EntityAction (nullptr, nullptr, atackAction, nullptr);
-          make_busy (arch_id);
-          m_entity_by_id[enemy_id].health -= prop.attack->damage;
-        }
-      set_map_damage (m_entity_by_id[enemy_id], false);
-      arch_aims.erase (it);
-      it = arch_aims.begin ();
-    }
-  ////          KILL RANGED_UNIT IF CAN            ////
-  /////////////////////////////////////////////////////
 
-  ////////////////////////////////////////////////////
-  ////          KILL MELEE_UNIT IF CAN            ////
-  std::unordered_map<int, std::unordered_set<int>> melee_aims; // enemy_id -> our_ids   who  can attack
-  std::unordered_map<int, std::unordered_set<int>> melee_vict; // our_id   -> enemy_ids whom can attack
-  EntityType enemy_type = MELEE_UNIT;
-  const EntityProperties &enemy_prop = playerView->entityProperties.at (enemy_type);
-  for (const Entity &arch : get_vector (type))
-    {
-      if (is_busy (arch))
-        continue;
-      for (const Entity &enemy : get_enemy_vector (enemy_type))
-        {
-          if (get_distance (arch.position, enemy.position) <= prop.attack->attackRange)
-            {
-              melee_aims[enemy.id].insert (arch.id);
-              melee_vict[arch.id].insert (enemy.id);
-            }
-        }
-    }
-  
-  for (auto it = melee_aims.begin (); it != melee_aims.end ();)
-    {
-      const int enemy_id = it->first;
-      auto &our_archs = it->second;
-      if (our_archs.size () * prop.attack->damage < m_entity_by_id[enemy_id].health)
-        {
-          if (our_archs.empty ())
-            {
-              melee_aims.erase (it);
-              it = melee_aims.begin ();
-            }
-          else
-            ++it;
-          continue;
-        }
-      while (m_entity_by_id[enemy_id].health > 0)
-        {
-          const int arch_id = *our_archs.begin ();
-          for (const int enemy_id_ : melee_vict[arch_id])
-            melee_aims[enemy_id_].erase (arch_id);
-  
-          std::shared_ptr<AttackAction> atackAction  = std::shared_ptr<AttackAction> (new AttackAction (std::shared_ptr<int> (new int (enemy_id)), nullptr));
-          result->entityActions[arch_id] = EntityAction (nullptr, nullptr, atackAction, nullptr);
-          make_busy (arch_id);
-          m_entity_by_id[enemy_id].health -= prop.attack->damage;
-        }
-      set_map_damage (m_entity_by_id[enemy_id], false);
-      melee_aims.erase (it);
-      it = melee_aims.begin ();
-    }
-  ////          KILL MELEE_UNIT IF CAN            ////
-  ////////////////////////////////////////////////////
-
-  //////////////////////////////////////////////
-  ////          HURT RANGED_UNIT            ////
-  for (auto &it : arch_vict)
-    {
-      const int arch_id = it.first;
-      if (is_busy (arch_id))
-        continue;
-      auto &enemy_ids = it.second;
-      if (!enemy_ids.empty ())
-        {
-          Entity &enemy = m_entity_by_id[*enemy_ids.begin ()];
-          std::shared_ptr<AttackAction> atackAction  = std::shared_ptr<AttackAction> (new AttackAction (std::shared_ptr<int> (new int (enemy.id)), nullptr));
-          // TO-DO: add run away action
-          result->entityActions[arch_id] = EntityAction (nullptr, nullptr, atackAction, nullptr);
-          make_busy (arch_id);
-          m_entity_by_id[enemy.id].health -= prop.attack->damage;
-          if (enemy.health <= 0)
-            set_map_damage (enemy, false);
-        }
-    }
-  ////          HURT RANGED_UNIT            ////
-  //////////////////////////////////////////////
   
   //////////////////////////////////////////////////
   ////          ATTACK TURRET IF CAN            ////
@@ -1026,136 +915,33 @@ void game_step_t::move_archers ()
     }
   ////          RUN AWAY FROM EVERYONE IF NEED            ////
   ////////////////////////////////////////////////////////////
+}
 
-  //////////////////////////////////////////////
-  ////          HURT BUILDER_UNIT           ////
-  for (const Entity &arch : get_vector (type))
+void game_step_t::attack_others ()
+{
+  for (const EntityType enemy_type : {BUILDER_UNIT, MELEE_BASE, RANGED_BASE, BUILDER_BASE, HOUSE, WALL})
     {
-      if (is_busy (arch))
-        continue;
-      EntityType enemy_type = BUILDER_UNIT;
-      for (Entity &enemy : get_enemy_vector (enemy_type))
+      const EntityProperties &ememy_prop = playerView->entityProperties.at (enemy_type);
+      for (const EntityType type : {MELEE_UNIT, RANGED_UNIT, TURRET, BUILDER_UNIT})
         {
-          if (enemy.health > 0 && get_distance (arch.position, enemy.position) <= prop.attack->attackRange)
+          const EntityProperties &prop = playerView->entityProperties.at (type);
+          for (const Entity &entity : get_vector (type))
             {
-              std::shared_ptr<AttackAction> atackAction  = std::shared_ptr<AttackAction> (new AttackAction (std::shared_ptr<int> (new int (enemy.id)), nullptr));
-              result->entityActions[arch.id] = EntityAction (nullptr, nullptr, atackAction, nullptr);
-              make_busy (arch.id);
-              enemy.health -= prop.attack->damage;
-              //if (enemy.health <= 0)
-              //  set_map_damage (enemy, false);
-            }
-        }
-    }
-  ////          HURT BUILDER_UNIT           ////
-  //////////////////////////////////////////////
-  
-  /////////////////////////////////////////////
-  ////          HURT MELEE_UNIT            ////
-  for (auto &it : melee_vict)
-    {
-      const int arch_id = it.first;
-      if (is_busy (arch_id))
-        continue;
-      auto &enemy_ids = it.second;
-      if (!enemy_ids.empty ())
-        {
-          Entity &enemy = m_entity_by_id[*enemy_ids.begin ()];
-          std::shared_ptr<AttackAction> atackAction  = std::shared_ptr<AttackAction> (new AttackAction (std::shared_ptr<int> (new int (enemy.id)), nullptr));
-          // TO-DO: add run away action
-          result->entityActions[arch_id] = EntityAction (nullptr, nullptr, atackAction, nullptr);
-          make_busy (arch_id);
-          m_entity_by_id[enemy.id].health -= prop.attack->damage;
-          if (enemy.health <= 0)
-            set_map_damage (enemy, false);
-        }
-    }
-  ////          HURT MELEE_UNIT            ////
-  /////////////////////////////////////////////
-  
-  ////////////////////////////////////////////
-  ////          HURT MELEE_BASE           ////
-  for (const Entity &arch : get_vector (type))
-    {
-      if (is_busy (arch))
-        continue;
-      EntityType enemy_type = MELEE_BASE;
-      for (Entity &enemy : get_enemy_vector (enemy_type))
-        {
-          if (enemy.health > 0 && get_build_distance (enemy.id, arch.position) <= prop.attack->attackRange)
-            {
-              std::shared_ptr<AttackAction> atackAction  = std::shared_ptr<AttackAction> (new AttackAction (std::shared_ptr<int> (new int (enemy.id)), nullptr));
-              result->entityActions[arch.id] = EntityAction (nullptr, nullptr, atackAction, nullptr);
-              make_busy (arch.id);
-              enemy.health -= prop.attack->damage;
-            }
-        }
-    }
-  ////          HURT MELEE_BASE           ////
-  ////////////////////////////////////////////
-  
-  /////////////////////////////////////////////
-  ////          HURT RANGED_BASE           ////
-  for (const Entity &arch : get_vector (type))
-    {
-      if (is_busy (arch))
-        continue;
-      EntityType enemy_type = RANGED_BASE;
-      for (Entity &enemy : get_enemy_vector (enemy_type))
-        {
-          if (enemy.health > 0 && get_build_distance (enemy.id, arch.position) <= prop.attack->attackRange)
-            {
-              std::shared_ptr<AttackAction> atackAction  = std::shared_ptr<AttackAction> (new AttackAction (std::shared_ptr<int> (new int (enemy.id)), nullptr));
-              result->entityActions[arch.id] = EntityAction (nullptr, nullptr, atackAction, nullptr);
-              make_busy (arch.id);
-              enemy.health -= prop.attack->damage;
-            }
-        }
-    }
-  ////          HURT RANGED_BASE           ////
-  /////////////////////////////////////////////
-  
-  //////////////////////////////////////////////
-  ////          HURT BUILDER_BASE           ////
-  for (const Entity &arch : get_vector (type))
-    {
-      if (is_busy (arch))
-        continue;
-      EntityType enemy_type = BUILDER_BASE;
-      for (Entity &enemy : get_enemy_vector (enemy_type))
-        {
-          if (enemy.health > 0 && get_build_distance (enemy.id, arch.position) <= prop.attack->attackRange)
-            {
-              std::shared_ptr<AttackAction> atackAction  = std::shared_ptr<AttackAction> (new AttackAction (std::shared_ptr<int> (new int (enemy.id)), nullptr));
-              result->entityActions[arch.id] = EntityAction (nullptr, nullptr, atackAction, nullptr);
-              make_busy (arch.id);
-              enemy.health -= prop.attack->damage;
-            }
-        }
-    }
-  ////          HURT BUILDER_BASE           ////
-  //////////////////////////////////////////////
+              if (is_busy (entity))
+                continue;
+              for (Entity &enemy : get_enemy_vector (enemy_type))
+                {
+                  if (enemy.health <= 0 || get_distance (entity, enemy) > prop.attack->attackRange)
+                    continue;
 
-  ///////////////////////////////////////
-  ////          HURT HOUSE           ////
-  for (const Entity &arch : get_vector (type))
-    {
-      if (is_busy (arch))
-        continue;
-      EntityType enemy_type = HOUSE;
-      for (Entity &enemy : get_enemy_vector (enemy_type))
-        {
-          if (enemy.health > 0 && get_build_distance (enemy.id, arch.position) <= prop.attack->attackRange)
-            {
-              std::shared_ptr<AttackAction> atackAction  = std::shared_ptr<AttackAction> (new AttackAction (std::shared_ptr<int> (new int (enemy.id)), nullptr));
-              result->entityActions[arch.id] = EntityAction (nullptr, nullptr, atackAction, nullptr);
-              make_busy (arch.id);
-              enemy.health -= prop.attack->damage;
+                  std::shared_ptr<AttackAction> atackAction  = std::shared_ptr<AttackAction> (new AttackAction (std::shared_ptr<int> (new int (enemy.id)), nullptr));
+                  result->entityActions[entity.id] = EntityAction (nullptr, nullptr, atackAction, nullptr);
+                  make_busy (entity.id);
+                  enemy.health -= prop.attack->damage;
+                }
             }
         }
     }
-  ////          HURT HOUSE           ////
-  ///////////////////////////////////////
 }
 
 void game_step_t::move_army (const EntityType type)
@@ -1210,7 +996,7 @@ void game_step_t::turn_on_turrets ()
 
   for (const Entity &entity : get_vector (type))
     {
-      if (is_busy (entity))
+      if (is_busy (entity) || !entity.active)
         continue;
       std::shared_ptr<MoveAction>   moveAction   = nullptr;
       std::shared_ptr<BuildAction>  buildAction  = nullptr;
@@ -1223,8 +1009,8 @@ void game_step_t::turn_on_turrets ()
 
 void game_step_t::send_cleaners ()
 {
-  if (cleaner_lvs.size () == 2 && m_population_max > 15)
-    cleaner_lvs.push_back (cleaner_lvs.back () + 2);
+  if (cleaner_lvs.size () == 2 && m_population_max > 5)
+    cleaner_lvs.push_back (cleaner_lvs.back ());
   for (int cleaner_id = 0; cleaner_id < game_step_t::cleaner_lvs.size (); ++cleaner_id)
     {
       const Vec2Int pos = get_cleaner_aim (cleaner_id);

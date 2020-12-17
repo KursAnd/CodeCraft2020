@@ -82,6 +82,8 @@ public:
   void get_nearest_worker_and_best_pos (const Vec2Int build_pos, const EntityType buildType, const Entity *&entity, Vec2Int &best_pos) const;
   static int get_distance (const Vec2Int pos_a, const Vec2Int pos_b);
   int get_build_distance (const int id /*build*/, const Vec2Int pos) const;
+  int get_build_to_build_distance (const Entity &a, const Entity &b) const;
+  int get_distance (const Entity &a, const Entity &b) const;
   int get_distance_for_base (const int id_a, const Vec2Int &pos_b, const EntityType type_b, Vec2Int &best_pos) const;
   std::vector<Vec2Int> get_nearest_free_places_for_me (const int id_a, const int id_b) const;
   std::vector<Vec2Int> get_nearest_free_places_for_me (const int id_a, const Vec2Int pos, const EntityType type) const;
@@ -97,7 +99,9 @@ public:
   void train_unit (const EntityType factoryType);
   void check_repair (const EntityType repairType);
   void move_builders ();
+  void attack_in_zone ();
   void move_archers ();
+  void attack_others ();
   void move_army (const EntityType type);
   void turn_on_turrets ();
   void save_builders ();

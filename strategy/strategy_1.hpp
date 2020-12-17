@@ -12,16 +12,19 @@ void strategy_1 (const PlayerView& playerView, DebugInterface* debugInterface, A
 
   game_step_t gs (playerView, result);
 
+  gs.attack_in_zone ();
+  gs.move_archers ();
+  gs.attack_others ();
+
+  gs.heal_nearest ();
+  gs.save_builders ();
+  gs.send_cleaners ();
+
   gs.check_repair (BUILDER_BASE);
   gs.check_repair (RANGED_BASE);
   gs.check_repair (TURRET);
-
-  gs.save_builders ();
-  gs.heal_nearest ();
-  gs.send_cleaners ();
-
-  gs.check_repair (MELEE_BASE);
   gs.check_repair (HOUSE);
+  gs.check_repair (MELEE_BASE);
   gs.check_repair (WALL);
   
   gs.train_unit (BUILDER_BASE);
@@ -34,8 +37,8 @@ void strategy_1 (const PlayerView& playerView, DebugInterface* debugInterface, A
   gs.try_build (HOUSE);
   gs.try_build (TURRET);
   gs.try_build (WALL);
-  
-  gs.move_archers ();
+
+
   gs.move_builders ();
   gs.run_tasks ();
   gs.make_atack_groups ();
