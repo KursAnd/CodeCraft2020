@@ -13,11 +13,11 @@ void strategy_1 (const PlayerView& playerView, DebugInterface* debugInterface, A
   game_step_t gs (playerView, result);
 
   gs.attack_in_zone ();
-  gs.move_archers ();
+  gs.attack_out_zone ();
   gs.attack_others ();
 
-  gs.heal_nearest ();
   gs.save_builders ();
+  gs.heal_nearest ();
   gs.send_cleaners ();
 
   gs.check_repair (BUILDER_BASE);

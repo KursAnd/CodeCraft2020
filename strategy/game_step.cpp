@@ -87,6 +87,23 @@ game_step_t::game_step_t (const PlayerView &_playerView, Action &_result)
     }
   if (m_res_pos.x == _playerView.mapSize - 1 && m_res_pos.y == _playerView.mapSize - 1)
     m_res_pos = Vec2Int (0, 0);
+  if (!enemy_near_base_ids.empty ())
+    {
+      std::vector<int> need_return;
+      for (const std::pair<int, Vec2Int> &task : game_step_t::attack_move_tasks)
+        {
+          if (!m_entity_by_id.count (task.first))
+            {
+              need_return.push_back (task.first);
+              continue;
+            }
+          const Entity &entity = m_entity_by_id[task.first];
+          if (entity.position.x <= MY_BASE_ZONE + 5 && entity.position.y <= MY_BASE_ZONE + 5)
+            need_return.push_back (task.first);
+        }
+      for (const int id : need_return)
+        game_step_t::attack_move_tasks.erase (id);
+    }
 
   const int custom_value = (playerView->fogOfWar ? 100 : 0);
   map = std::vector<std::vector<int>> (playerView->mapSize);
@@ -189,16 +206,17 @@ bool game_step_t::need_build (const EntityType type) const
             && m_population_max > 30
             && m_population_use > 25
             && 1.0 * m_population_use / m_population_max > 0.65
-            && get_count (BUILDER_BASE) > 0;
+            && get_count (BUILDER_BASE) > 0
+            && get_count (RANGED_BASE) > 0;
       case WALL        :
         return get_count (BUILDER_UNIT) >= MIN_BUILDER_UNITS
-            && m_population_max > 30
-            && m_population_use > 25
+            && m_population_use > 30
             && (   get_count (WALL) < 2
                 || (   get_count (TURRET) > 3
                     && get_count (WALL) * 2 < get_count (TURRET) * 3
                     && 1.0 * m_population_use / m_population_max > 0.7))
-            && get_base_count () >= 2;
+            && get_count (BUILDER_BASE) > 0
+            && get_count (RANGED_BASE) > 0;
 
       case BUILDER_BASE:
       case RANGED_BASE :
@@ -782,21 +800,9 @@ void game_step_t::attack_in_zone ()
         {
           const int enemy_id = it->first;
           Entity &enemy = m_entity_by_id[enemy_id];
-          if (enemy.health <= 0)
-            {
-              int ERROR = 5;
-              int y = 5;
-              int u = 7 / (ERROR - u);
-            }
           if (enemy.entityType != enemy_type)
             continue;
           std::unordered_set<int> &our_ids = it->second;
-          if (our_ids.empty ())
-            {
-              int ERROR = 5;
-              int y = 5;
-              int u = 7 / (ERROR - u);
-            }
           for (const int id : our_ids)
             {
               std::shared_ptr<AttackAction> atackAction  = std::shared_ptr<AttackAction> (new AttackAction (std::shared_ptr<int> (new int (enemy_id)), nullptr));
@@ -808,7 +814,7 @@ void game_step_t::attack_in_zone ()
     }
 }
 
-void game_step_t::move_archers ()
+void game_step_t::attack_out_zone ()
 {
   const EntityType type = RANGED_UNIT;
   const EntityProperties &prop = playerView->entityProperties.at (type);
@@ -879,7 +885,9 @@ void game_step_t::move_archers ()
   ////          RUN AWAY FROM EVERYONE IF NEED            ////
   for (const Entity &arch : get_vector (type))
     {
-      if (is_busy (arch) || map_damage[arch.position.x][arch.position.y] != 0)
+      if (   is_busy (arch)
+          || map_damage[arch.position.x][arch.position.y] != 0
+          || (arch.position.x <= MY_BASE_ZONE && arch.position.y <= MY_BASE_ZONE))
         continue;
 
       auto is_safe_area = [&] (const Vec2Int pos)
@@ -972,7 +980,7 @@ void game_step_t::move_army (const EntityType type)
                   dis = new_dis;
                 }
             }
-          moveAction = std::shared_ptr<MoveAction> (new MoveAction (pos, true, false));
+          moveAction = std::shared_ptr<MoveAction> (new MoveAction (pos, true, true));
         }
       else
         {
@@ -1104,32 +1112,12 @@ void game_step_t::heal_nearest ()
               break;
             }
         }
-      //for (const EntityType repair_type : {RANGED_UNIT, MELEE_UNIT, BUILDER_UNIT})
-      //  {
-      //    const EntityProperties &p = playerView->entityProperties.at (repair_type);
-      //    for (const Entity &repair_entity : get_vector (repair_type))
-      //      {
-      //        if (repair_entity.health < p.maxHealth && get_distance (healer.position, repair_entity.position) == 1)
-      //          {
-      //            std::shared_ptr<MoveAction>   moveAction   = nullptr;
-      //            std::shared_ptr<BuildAction>  buildAction  = nullptr;
-      //            std::shared_ptr<AttackAction> atackAction  = nullptr;
-      //            std::shared_ptr<RepairAction> repairAction = std::shared_ptr<RepairAction> (new RepairAction (repair_entity.id));
-
-      //            make_busy (healer.id);
-      //            result->entityActions[healer.id] = EntityAction (moveAction, buildAction, atackAction, repairAction);
-      //            break;
-      //          }
-      //      }
-      //    if (is_busy (healer))
-      //      break;
-      //  }
     }
 }
 
 bool game_step_t::find_escape_way_for_workers (const EntityType type, const Vec2Int worker_pos, Vec2Int &safe_pos) const
 {
-  const int safe_range = playerView->entityProperties.at (type).attack->attackRange + 5;
+  const int safe_range = playerView->entityProperties.at (type).attack->attackRange + 3;
   const int l = 0, r = 1, d = 2, u = 3;
   //                       l  r  d  u
   std::vector<int> escape {0, 0, 0, 0};
@@ -1242,7 +1230,7 @@ void game_step_t::run_tasks ()
 
 void game_step_t::make_atack_groups ()
 {
-  if ((get_army_count () - game_step_t::attack_move_tasks.size () > 12 || (!game_step_t::destroyed_pos.empty () && get_count (TURRET) >= 3))
+  if ((get_army_count () - game_step_t::attack_move_tasks.size () > 15 || (!game_step_t::destroyed_pos.empty () && get_count (TURRET) >= 3))
     && enemy_near_base_ids.empty ())
     {
       int dir = choose_atack_pos ();
@@ -1250,7 +1238,7 @@ void game_step_t::make_atack_groups ()
         return;
       for (const Entity &entity : get_vector (RANGED_UNIT))
         {
-          if (rand () % 20 == 0 || is_busy (entity)) // 95%
+          if (rand () % 10 == 0 || is_busy (entity)) // 90%
             continue;
           
           const EntityProperties &properties = playerView->entityProperties.at (entity.entityType);
