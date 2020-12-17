@@ -25,6 +25,8 @@ private:
   std::vector<std::pair<EntityType, int>> cleaner_aims;
 
   const int MIN_BUILDER_UNITS = 13;
+  const int MY_BASE_ZONE = 30;
+  std::vector<int> enemy_near_base_ids;
 
   int m_id = 0;
   int m_resource = 0;

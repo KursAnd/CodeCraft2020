@@ -75,6 +75,8 @@ game_step_t::game_step_t (const PlayerView &_playerView, Action &_result)
           else
             {
               m_enemy[entity.entityType].push_back (entity);
+              if (entity.position.x <= MY_BASE_ZONE && entity.position.y <= MY_BASE_ZONE)
+                enemy_near_base_ids.push_back (entity.id);
             }
         }
       else if (entity.entityType == RESOURCE)
@@ -1171,14 +1173,21 @@ void game_step_t::move_army (const EntityType type)
       std::shared_ptr<AttackAction> atackAction  = std::shared_ptr<AttackAction> (new AttackAction (nullptr, std::shared_ptr<AutoAttack> (new AutoAttack (properties.sightRange, {}))));
       std::shared_ptr<RepairAction> repairAction = nullptr;
 
-      Vec2Int pos;
-      if (   get_pos_for_safe_operation (BUILDER_BASE, pos)
-          || get_pos_for_safe_operation (RANGED_BASE , pos)
-          || get_pos_for_safe_operation (MELEE_BASE  , pos)
-          || get_pos_for_safe_operation (TURRET      , pos)
-          || get_pos_for_safe_operation (HOUSE       , pos)
-          || get_pos_for_safe_operation (WALL        , pos))
-        moveAction = std::shared_ptr<MoveAction> (new MoveAction (pos, true, false));
+      if (!enemy_near_base_ids.empty ())
+        {
+          Vec2Int pos = INCORRECT_VEC2INT;
+          int dis = get_max_distance ();
+          for (const int enemy_id : enemy_near_base_ids)
+            {
+              int new_dis = get_distance (entity.position, m_entity_by_id[enemy_id].position);
+              if (dis > new_dis)
+                {
+                  pos = m_entity_by_id[enemy_id].position;
+                  dis = new_dis;
+                }
+            }
+          moveAction = std::shared_ptr<MoveAction> (new MoveAction (pos, true, false));
+        }
       else
         {
           if (entity.id % 4 < 2)
@@ -1447,7 +1456,8 @@ void game_step_t::run_tasks ()
 
 void game_step_t::make_atack_groups ()
 {
-  if (get_army_count () - game_step_t::attack_move_tasks.size () > 12 || (!game_step_t::destroyed_pos.empty () && get_count (TURRET) >= 3))
+  if ((get_army_count () - game_step_t::attack_move_tasks.size () > 12 || (!game_step_t::destroyed_pos.empty () && get_count (TURRET) >= 3))
+    && enemy_near_base_ids.empty ())
     {
       int dir = choose_atack_pos ();
       if (dir < 0)
