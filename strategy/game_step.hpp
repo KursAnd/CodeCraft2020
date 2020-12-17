@@ -106,7 +106,6 @@ public:
   void run_tasks ();
   void make_atack_groups ();
   void make_protect_groups ();
-  void add_move_task (const int id, const Vec2Int id_rep);
   void redirect_all_atack_move_tasks (const Vec2Int old_pos, const Vec2Int new_pos);
 
 

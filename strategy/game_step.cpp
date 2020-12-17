@@ -578,9 +578,38 @@ void game_step_t::train_unit (const EntityType factoryType)
 
       if (need_build (buildType))
         {
-          //TO-DO: build in different places + check emptiness
-          buildAction = std::shared_ptr<BuildAction> (new BuildAction (buildType, Vec2Int (entity.position.x + properties.size, entity.position.y + properties.size - 1)));
+          Vec2Int best_pos = INCORRECT_VEC2INT;
+          for (const Vec2Int pos : {Vec2Int (entity.position.x + properties.size    , entity.position.y + properties.size - 1),
+                                    Vec2Int (entity.position.x + properties.size - 1, entity.position.y + properties.size    ),
+                                    Vec2Int (entity.position.x + properties.size    , entity.position.y + properties.size - 2),
+                                    Vec2Int (entity.position.x + properties.size - 2, entity.position.y + properties.size    ),
+                                    Vec2Int (entity.position.x + properties.size    , entity.position.y + properties.size - 3),
+                                    Vec2Int (entity.position.x + properties.size - 3, entity.position.y + properties.size    ),
+                                    Vec2Int (entity.position.x + properties.size    , entity.position.y + properties.size - 4),
+                                    Vec2Int (entity.position.x + properties.size - 4, entity.position.y + properties.size    ),
+                                    Vec2Int (entity.position.x + properties.size    , entity.position.y + properties.size - 5),
+                                    Vec2Int (entity.position.x + properties.size - 5, entity.position.y + properties.size    ),
+                                    Vec2Int (entity.position.x + properties.size - 1, entity.position.y + properties.size - 1),
+                                    Vec2Int (entity.position.x +                 - 1, entity.position.y + properties.size - 1),
+                                    Vec2Int (entity.position.x + properties.size - 2, entity.position.y + properties.size - 1),
+                                    Vec2Int (entity.position.x +                 - 1, entity.position.y + properties.size - 2),
+                                    Vec2Int (entity.position.x + properties.size - 3, entity.position.y + properties.size - 1),
+                                    Vec2Int (entity.position.x +                 - 1, entity.position.y + properties.size - 3),
+                                    Vec2Int (entity.position.x + properties.size - 4, entity.position.y + properties.size - 1),
+                                    Vec2Int (entity.position.x +                 - 1, entity.position.y + properties.size - 4),
+                                    Vec2Int (entity.position.x + properties.size - 5, entity.position.y + properties.size - 1),
+                                    Vec2Int (entity.position.x +                 - 1, entity.position.y + properties.size - 5)})
+            {
+              if (is_place_free (pos))
+                {
+                  best_pos = pos;
+                  break;
+                }
+            }
+          if (!is_correct (best_pos))
+            continue;
 
+          buildAction = std::shared_ptr<BuildAction> (new BuildAction (buildType, best_pos));
           make_busy (entity);
           buy_entity (buildType);
         }
