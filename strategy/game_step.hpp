@@ -23,6 +23,7 @@ private:
 
   static std::vector<int> cleaner_lvs;
   std::vector<std::pair<EntityType, int>> cleaner_aims;
+  bool builders_is_attakers = false;
 
   const int MIN_BUILDER_UNITS = 13;
   const int MY_BASE_ZONE = 30;

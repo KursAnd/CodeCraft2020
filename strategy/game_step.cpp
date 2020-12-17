@@ -81,6 +81,7 @@ game_step_t::game_step_t (const PlayerView &_playerView, Action &_result)
         }
       else if (entity.entityType == RESOURCE)
         {
+          m_entity[entity.entityType].push_back (entity);
           if (m_res_pos.x + m_res_pos.y > entity.position.x + entity.position.y)
             m_res_pos = entity.position;
         }
@@ -103,6 +104,26 @@ game_step_t::game_step_t (const PlayerView &_playerView, Action &_result)
         }
       for (const int id : need_return)
         game_step_t::attack_move_tasks.erase (id);
+    }
+
+  if (m_entity[RESOURCE].empty () && playerView->currentTick > 30)
+    {
+      builders_is_attakers = true;
+      const EntityProperties &properties = playerView->entityProperties.at (BUILDER_UNIT);
+      for (const Entity &entity : get_vector (BUILDER_UNIT))
+        {
+          std::shared_ptr<MoveAction>   moveAction   = nullptr;
+          std::shared_ptr<AttackAction> atackAction  = std::shared_ptr<AttackAction> (new AttackAction (nullptr, std::shared_ptr<AutoAttack> (new AutoAttack (properties.sightRange, {}))));
+          switch (entity.id % 3)
+            {
+              case 0: moveAction = std::shared_ptr<MoveAction> (new MoveAction (Vec2Int (playerView->mapSize / 2 + rand () % (playerView->mapSize / 2), rand () % (playerView->mapSize / 2)), true, true)); break;
+              case 1: moveAction = std::shared_ptr<MoveAction> (new MoveAction (Vec2Int (rand () % (playerView->mapSize / 2), playerView->mapSize / 2 + rand () % (playerView->mapSize / 2)), true, true)); break;
+              case 2: moveAction = std::shared_ptr<MoveAction> (new MoveAction (Vec2Int (playerView->mapSize / 2 + rand () % (playerView->mapSize / 2), playerView->mapSize / 2 + rand () % (playerView->mapSize / 2)), true, true)); break;
+            }
+
+          make_busy (entity.id);
+          result->entityActions[entity.id] = EntityAction (moveAction, nullptr, atackAction, nullptr);
+        }
     }
 
   const int custom_value = (playerView->fogOfWar ? 100 : 0);
@@ -187,8 +208,9 @@ bool game_step_t::need_build (const EntityType type) const
     return false;
   switch (type)
     {
-      case BUILDER_UNIT: return get_count (BUILDER_UNIT) < std::max (MIN_BUILDER_UNITS, m_population_max * 4 / 10)
-                             || (get_count (BUILDER_UNIT) < MIN_BUILDER_UNITS * 2 && !can_build (RANGED_UNIT));
+      case BUILDER_UNIT: return (   get_count (BUILDER_UNIT) < std::max (MIN_BUILDER_UNITS, m_population_max * 4 / 10)
+                                 || (get_count (BUILDER_UNIT) < MIN_BUILDER_UNITS * 2 && !can_build (RANGED_UNIT)))
+                             && !builders_is_attakers;
       case RANGED_UNIT : return get_count (BUILDER_UNIT) >= MIN_BUILDER_UNITS;
       case MELEE_UNIT  : return get_count (BUILDER_UNIT) >= MIN_BUILDER_UNITS
                              && (   (m_population_use <  40                          && get_count (MELEE_UNIT)     < get_count (RANGED_UNIT)    )
