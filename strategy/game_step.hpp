@@ -44,6 +44,7 @@ private:
   std::vector<std::vector<int>> map;
   std::vector<std::vector<int>> map_id;
   std::vector<std::vector<int>> map_damage;
+  std::vector<std::vector<int>> map_run;
 
   std::unordered_map<EntityType, std::vector<Entity>> m_enemy;
 

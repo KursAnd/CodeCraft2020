@@ -130,11 +130,13 @@ game_step_t::game_step_t (const PlayerView &_playerView, Action &_result)
   map = std::vector<std::vector<int>> (playerView->mapSize);
   map_id = std::vector<std::vector<int>> (playerView->mapSize);
   map_damage = std::vector<std::vector<int>> (playerView->mapSize);
+  map_run = std::vector<std::vector<int>> (playerView->mapSize);
   for (int i = 0; i < playerView->mapSize; ++i)
     {
       map[i] = std::vector<int> (playerView->mapSize, custom_value);
       map_id[i] = std::vector<int> (playerView->mapSize, -1);
       map_damage[i] = std::vector<int> (playerView->mapSize, 0);
+      map_run[i] = std::vector<int> (playerView->mapSize, 0);
     }
   if (playerView->fogOfWar)
     {
@@ -187,6 +189,40 @@ game_step_t::game_step_t (const PlayerView &_playerView, Action &_result)
     for (const Entity &entity : get_enemy_vector (type))
       if (entity.active)
         set_map_damage (entity);
+
+  // attack zone
+  for (int x = 0; x < playerView->mapSize; ++x)
+    for (int y = 0; y < playerView->mapSize; ++y)
+      {
+        if (map_damage[x][y] > 0)
+          map_run[x][y] = 3;
+      }
+  // attack zone in 1 step
+  for (int x = 1; x < playerView->mapSize; ++x)
+    for (int y = 0; y < playerView->mapSize; ++y)
+      {
+        if (map_run[x][y] == 0 && map_run[x - 1][y] == 3)
+          map_run[x][y] = 2;
+        if (map_run[x - 1][y] == 0 && map_run[x][y] == 3)
+          map_run[x - 1][y] = 2;
+        if (map_run[y][x] == 0 && map_run[y][x - 1] == 3)
+          map_run[y][x] = 2;
+        if (map_run[y][x - 1] == 0 && map_run[y][x] == 3)
+          map_run[y][x - 1] = 2;
+      }
+  // attack zone in 2 step
+  for (int x = 1; x < playerView->mapSize; ++x)
+    for (int y = 0; y < playerView->mapSize; ++y)
+      {
+        if (map_run[x][y] == 0 && map_run[x - 1][y] == 2)
+          map_run[x][y] = 1;
+        if (map_run[x - 1][y] == 0 && map_run[x][y] == 2)
+          map_run[x - 1][y] = 1;
+        if (map_run[y][x] == 0 && map_run[y][x - 1] == 2)
+          map_run[y][x] = 1;
+        if (map_run[y][x - 1] == 0 && map_run[y][x] == 2)
+          map_run[y][x - 1] = 1;
+      }
 }
 
 Vec2Int game_step_t::get_place_for (const EntityType type) const
