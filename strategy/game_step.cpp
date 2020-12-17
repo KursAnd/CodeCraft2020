@@ -1062,8 +1062,6 @@ void game_step_t::send_cleaners ()
 
           if (map_id[pos.x][pos.y] >= 0)
             atackAction = std::shared_ptr<AttackAction> (new AttackAction (std::shared_ptr<int> (new int (map_id[pos.x][pos.y])), nullptr));
-          else
-            std::shared_ptr<AttackAction> (new AttackAction (nullptr, std::shared_ptr<AutoAttack> (new AutoAttack (properties.sightRange, {RESOURCE}))));
 
           make_busy (entity.id);
           result->entityActions[entity.id] = EntityAction (moveAction, buildAction, atackAction, repairAction);
