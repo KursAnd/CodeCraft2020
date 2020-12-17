@@ -112,4 +112,6 @@ public:
 
   int get_attack_pos_id_by_vec (const Vec2Int pos) const;
   int choose_atack_pos (const Vec2Int old_pos = Vec2Int (-1, -1));
+
+  bool get_pos_for_safe_operation (const EntityType type, Vec2Int &pos) const;
 };

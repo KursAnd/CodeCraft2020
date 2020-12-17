@@ -4,7 +4,7 @@ std::unordered_set<int> game_step_t::protect_l, game_step_t::protect_r, game_ste
 std::unordered_set<int> game_step_t::destroyed_pos;
 std::unordered_map<int, Vec2Int> game_step_t::attack_move_tasks;
 
-std::vector<int> game_step_t::cleaner_lvs = {0, 2};
+std::vector<int> game_step_t::cleaner_lvs = {0, 0};
 
 game_step_t::game_step_t (const PlayerView &_playerView, Action &_result)
   : playerView (&_playerView), result (&_result),
@@ -38,9 +38,9 @@ game_step_t::game_step_t (const PlayerView &_playerView, Action &_result)
   }
   {
     cleaner_aims = {
+        {RANGED_BASE, 0},
         {BUILDER_BASE, 0},
                                   {HOUSE, 0}, {HOUSE, 1}, {HOUSE, 2}, {HOUSE, 3}, {HOUSE, 4},
-        {RANGED_BASE, 0},
         {MELEE_BASE, 0},
         {TURRET, 0}, {TURRET, 1},
                                   {HOUSE, 5}, {HOUSE, 6}, {HOUSE, 7}, {HOUSE, 8}, {HOUSE, 9},
@@ -172,12 +172,16 @@ bool game_step_t::need_build (const EntityType type) const
                              || (get_count (BUILDER_UNIT) < MIN_BUILDER_UNITS * 2 && !can_build (RANGED_UNIT));
       case RANGED_UNIT : return get_count (BUILDER_UNIT) >= MIN_BUILDER_UNITS;
       case MELEE_UNIT  : return get_count (BUILDER_UNIT) >= MIN_BUILDER_UNITS
-                             && get_count (MELEE_UNIT) * 2 < get_count (RANGED_UNIT);
+                             && (   (m_population_use <  40                          && get_count (MELEE_UNIT)     < get_count (RANGED_UNIT)    )
+                                 || (m_population_use >= 40 && m_population_use < 80 && get_count (MELEE_UNIT) * 3 < get_count (RANGED_UNIT) * 2)
+                                 || (m_population_max >= 80                          && get_count (MELEE_UNIT)     < get_count (RANGED_UNIT) * 2)
+                                 || !can_build (RANGED_UNIT));
 
       case HOUSE       :
         return (get_count (BUILDER_UNIT) >= MIN_BUILDER_UNITS || m_population_use < MIN_BUILDER_UNITS)
             && m_population_use + 10 >= m_population_max_future
-            && get_count (BUILDER_BASE) > 0;
+            && get_count (BUILDER_BASE) > 0
+            && (get_count (RANGED_BASE) > 0 || get_count (MELEE_BASE) > 0 || m_population_max < MIN_BUILDER_UNITS * 2);
       case TURRET      :
         return get_count (BUILDER_UNIT) >= MIN_BUILDER_UNITS
             && m_population_max > 30
@@ -1138,10 +1142,23 @@ void game_step_t::move_army (const EntityType type)
       std::shared_ptr<AttackAction> atackAction  = std::shared_ptr<AttackAction> (new AttackAction (nullptr, std::shared_ptr<AutoAttack> (new AutoAttack (properties.sightRange, {}))));
       std::shared_ptr<RepairAction> repairAction = nullptr;
 
-      if (game_step_t::protect_l.count (entity.id))
-        moveAction = std::shared_ptr<MoveAction> (new MoveAction (Vec2Int (22 + rand () % 2, 5 + rand () % 15), true, false));
+      Vec2Int pos;
+      if (   get_pos_for_safe_operation (BUILDER_BASE, pos)
+          || get_pos_for_safe_operation (RANGED_BASE , pos)
+          || get_pos_for_safe_operation (MELEE_BASE  , pos)
+          || get_pos_for_safe_operation (TURRET      , pos)
+          || get_pos_for_safe_operation (HOUSE       , pos)
+          || get_pos_for_safe_operation (WALL        , pos))
+        moveAction = std::shared_ptr<MoveAction> (new MoveAction (pos, true, false));
       else
-        moveAction = std::shared_ptr<MoveAction> (new MoveAction (Vec2Int (5 + rand () % 15, 22 + rand () % 2), true, false));
+        {
+          if (entity.id % 4 < 2)
+            moveAction = std::shared_ptr<MoveAction> (new MoveAction (Vec2Int (10 + rand () % 13, 10 + rand () % 13), true, false));
+          else if (entity.id % 4 == 2)
+            moveAction = std::shared_ptr<MoveAction> (new MoveAction (Vec2Int (20 + rand () % 4, 3 + rand () % 12), true, false));
+          else
+            moveAction = std::shared_ptr<MoveAction> (new MoveAction (Vec2Int (3 + rand () % 12, 20 + rand () % 4), true, false));
+        }
 
       result->entityActions[entity.id] = EntityAction (moveAction, buildAction, atackAction, repairAction);
       make_busy (entity.id);
@@ -1186,8 +1203,13 @@ void game_step_t::send_cleaners ()
 
           std::shared_ptr<MoveAction>   moveAction   = std::shared_ptr<MoveAction> (new MoveAction (pos, false, true));
           std::shared_ptr<BuildAction>  buildAction  = nullptr;
-          std::shared_ptr<AttackAction> atackAction  = std::shared_ptr<AttackAction> (new AttackAction (std::shared_ptr<int> (new int (map_id[pos.x][pos.y])), nullptr));
+          std::shared_ptr<AttackAction> atackAction  = nullptr;
           std::shared_ptr<RepairAction> repairAction = nullptr;
+
+          if (map_id[pos.x][pos.y] >= 0)
+            atackAction = std::shared_ptr<AttackAction> (new AttackAction (std::shared_ptr<int> (new int (map_id[pos.x][pos.y])), nullptr));
+          else
+            std::shared_ptr<AttackAction> (new AttackAction (nullptr, std::shared_ptr<AutoAttack> (new AutoAttack (properties.sightRange, {RESOURCE}))));
 
           make_busy (entity.id);
           result->entityActions[entity.id] = EntityAction (moveAction, buildAction, atackAction, repairAction);
@@ -1396,7 +1418,7 @@ void game_step_t::run_tasks ()
 
 void game_step_t::make_atack_groups ()
 {
-  if (get_army_count () - game_step_t::attack_move_tasks.size () > 15 || (!game_step_t::destroyed_pos.empty () && get_count (TURRET) >= 3))
+  if (get_army_count () - game_step_t::attack_move_tasks.size () > 12 || (!game_step_t::destroyed_pos.empty () && get_count (TURRET) >= 3))
     {
       int dir = choose_atack_pos ();
       if (dir < 0)
@@ -1545,4 +1567,35 @@ int game_step_t::choose_atack_pos (const Vec2Int old_pos)
   while (destroyed_pos.count (dir));
 
   return dir;
+}
+
+bool game_step_t::get_pos_for_safe_operation (const EntityType type, Vec2Int &pos) const
+{
+  bool attacked = false;
+  const EntityProperties &properties = playerView->entityProperties.at (type);
+  if (get_count (type) == 0)
+    {
+      if (type == BUILDER_BASE || type == MELEE_BASE || type == RANGED_BASE)
+        {
+          pos = priority_places_for_building.at (type)[0];
+          pos.x += properties.size / 2 + rand () % properties.size;
+          pos.y += properties.size / 2 + rand () % properties.size;
+          attacked = true;
+        }
+    }
+  else
+    {
+      for (const Entity &entity : get_vector (type))
+        {
+          if (entity.active && entity.health < properties.maxHealth)
+            {
+              pos = entity.position;
+              pos.x += properties.size / 2 + rand () % properties.size;
+              pos.y += properties.size / 2 + rand () % properties.size;
+              attacked = true;
+              break;
+            }
+        }
+    }
+  return attacked;
 }
