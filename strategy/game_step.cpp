@@ -628,6 +628,61 @@ void game_step_t::move_builders ()
 
 void game_step_t::move_archers ()
 {
+  {
+    ///////////////////////////////////////////////
+    ////          HELP OF MELEE_UNIT           ////   
+    const EntityType type = MELEE_UNIT;
+    const EntityProperties &prop = playerView->entityProperties.at (type);
+    for (const Entity &melee : get_vector (type))
+      {
+        if (is_busy (melee))
+          continue;
+        EntityType enemy_type = RANGED_UNIT;
+        for (const Entity &enemy : get_enemy_vector (enemy_type))
+          {
+            if (enemy.health > 0 && get_distance (melee.position, enemy.position) <= prop.attack->attackRange)
+              {
+                std::shared_ptr<AttackAction> atackAction  = std::shared_ptr<AttackAction> (new AttackAction (std::shared_ptr<int> (new int (enemy.id)), nullptr));
+                result->entityActions[melee.id] = EntityAction (nullptr, nullptr, atackAction, nullptr);
+                make_busy (melee.id);
+                m_entity_by_id[enemy.id].health -= prop.attack->damage;
+              }
+          }
+          
+        if (is_busy (melee))
+          continue;
+        enemy_type = MELEE_UNIT;
+        for (const Entity &enemy : get_enemy_vector (enemy_type))
+          {
+            if (enemy.health > 0 && get_distance (melee.position, enemy.position) <= prop.attack->attackRange)
+              {
+                std::shared_ptr<AttackAction> atackAction  = std::shared_ptr<AttackAction> (new AttackAction (std::shared_ptr<int> (new int (enemy.id)), nullptr));
+                result->entityActions[melee.id] = EntityAction (nullptr, nullptr, atackAction, nullptr);
+                make_busy (melee.id);
+                m_entity_by_id[enemy.id].health -= prop.attack->damage;
+              }
+          }
+          
+        if (is_busy (melee))
+          continue;
+        enemy_type = TURRET;
+        for (const Entity &enemy : get_enemy_vector (enemy_type))
+          {
+            if (enemy.health > 0 && get_distance (melee.position, enemy.position) <= prop.attack->attackRange)
+              {
+                std::shared_ptr<AttackAction> atackAction  = std::shared_ptr<AttackAction> (new AttackAction (std::shared_ptr<int> (new int (enemy.id)), nullptr));
+                result->entityActions[melee.id] = EntityAction (nullptr, nullptr, atackAction, nullptr);
+                make_busy (melee.id);
+                m_entity_by_id[enemy.id].health -= prop.attack->damage;
+              }
+          }
+      }
+    ////          KILL RANGED_UNIT IF CAN            ////
+    /////////////////////////////////////////////////////
+  }
+
+
+
   const EntityType type = RANGED_UNIT;
   const EntityProperties &prop = playerView->entityProperties.at (type);
   
