@@ -15,6 +15,7 @@ private:
   std::unordered_map<EntityType, std::vector<Vec2Int>> priority_places_for_building;
   
   
+  static std::unordered_set<int> protect_l, protect_r, protect_c;
   static std::unordered_set<int> destroyed_pos;
   static std::unordered_map<int, Vec2Int> attack_move_tasks;
   std::vector<Vec2Int> attack_pos;
@@ -103,6 +104,7 @@ public:
 
   void run_tasks ();
   void make_atack_groups ();
+  void make_protect_groups ();
   void add_move_task (const int id, const Vec2Int id_rep);
   void redirect_all_atack_move_tasks (const Vec2Int old_pos, const Vec2Int new_pos);
 

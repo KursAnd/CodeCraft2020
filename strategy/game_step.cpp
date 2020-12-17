@@ -1,5 +1,6 @@
 #include "game_step.hpp"
 
+std::unordered_set<int> game_step_t::protect_l, game_step_t::protect_r, game_step_t::protect_c;
 std::unordered_set<int> game_step_t::destroyed_pos;
 std::unordered_map<int, Vec2Int> game_step_t::attack_move_tasks;
 
@@ -171,8 +172,7 @@ bool game_step_t::need_build (const EntityType type) const
                              || (get_count (BUILDER_UNIT) < MIN_BUILDER_UNITS * 2 && !can_build (RANGED_UNIT));
       case RANGED_UNIT : return get_count (BUILDER_UNIT) >= MIN_BUILDER_UNITS;
       case MELEE_UNIT  : return get_count (BUILDER_UNIT) >= MIN_BUILDER_UNITS
-                             && get_count (MELEE_UNIT) * 2 < get_count (RANGED_UNIT)
-                             && m_population_use + 10 < m_population_max_future;
+                             && get_count (MELEE_UNIT) * 2 < get_count (RANGED_UNIT);
 
       case HOUSE       :
         return (get_count (BUILDER_UNIT) >= MIN_BUILDER_UNITS || m_population_use < MIN_BUILDER_UNITS)
@@ -787,7 +787,7 @@ void game_step_t::move_archers ()
           continue;
         for (const Entity &enemy : get_enemy_vector (enemy_type))
           {
-            if (get_distance (arch.position, enemy.position) <= prop.attack->attackRange + 1)
+            if (get_distance (arch.position, enemy.position) <= prop.attack->attackRange + 3)
               {
                 turret_aims[enemy.id].insert (arch.id);
                 turret_vict[arch.id].insert (enemy.id);
@@ -799,7 +799,7 @@ void game_step_t::move_archers ()
       {
         const int enemy_id = it->first;
         auto &our_archs = it->second;
-        if (our_archs.size () < 4 || our_archs.size () * prop.attack->damage < m_entity_by_id[enemy_id].health / 2)
+        if (our_archs.size () < 4 && our_archs.size () * prop.attack->damage < m_entity_by_id[enemy_id].health / 2)
           {
             if (our_archs.empty ())
               {
@@ -817,7 +817,8 @@ void game_step_t::move_archers ()
               turret_aims[enemy_id_].erase (arch_id);
 
             std::shared_ptr<AttackAction> atackAction  = std::shared_ptr<AttackAction> (new AttackAction (std::shared_ptr<int> (new int (enemy_id)), nullptr));
-            result->entityActions[arch_id] = EntityAction (nullptr, nullptr, atackAction, nullptr);
+            std::shared_ptr<MoveAction>   moveAction   = std::shared_ptr<MoveAction> (new MoveAction (m_entity_by_id[enemy_id].position, true, false));
+            result->entityActions[arch_id] = EntityAction (moveAction, nullptr, atackAction, nullptr);
             make_busy (arch_id);
             m_entity_by_id[enemy_id].health -= prop.attack->damage;
           }
@@ -890,14 +891,12 @@ void game_step_t::move_army (const EntityType type)
       std::shared_ptr<BuildAction>  buildAction  = nullptr;
       std::shared_ptr<AttackAction> atackAction  = std::shared_ptr<AttackAction> (new AttackAction (nullptr, std::shared_ptr<AutoAttack> (new AutoAttack (properties.sightRange, {}))));
       std::shared_ptr<RepairAction> repairAction = nullptr;
-        {
-          if (entity.id % 4 < 2)
-            moveAction = std::shared_ptr<MoveAction> (new MoveAction (Vec2Int (10 + rand () % 13, 10 + rand () % 13), true, false));
-          else if (entity.id % 4 == 2)
-            moveAction = std::shared_ptr<MoveAction> (new MoveAction (Vec2Int (20 + rand () % 4, 3 + rand () % 12), true, false));
-          else
-            moveAction = std::shared_ptr<MoveAction> (new MoveAction (Vec2Int (3 + rand () % 12, 20 + rand () % 4), true, false));
-        }
+
+      if (game_step_t::protect_l.count (entity.id))
+        moveAction = std::shared_ptr<MoveAction> (new MoveAction (Vec2Int (22 + rand () % 2, 5 + rand () % 15), true, false));
+      else
+        moveAction = std::shared_ptr<MoveAction> (new MoveAction (Vec2Int (5 + rand () % 15, 22 + rand () % 2), true, false));
+
       result->entityActions[entity.id] = EntityAction (moveAction, buildAction, atackAction, repairAction);
       make_busy (entity.id);
     }
@@ -1166,6 +1165,8 @@ void game_step_t::make_atack_groups ()
           result->entityActions[entity.id] = EntityAction (moveAction, nullptr, atackAction, nullptr);
           game_step_t::attack_move_tasks[entity.id] = attack_pos[dir];
           make_busy (entity.id);
+          protect_l.erase (entity.id);
+          protect_r.erase (entity.id);
         }
       for (const Entity &entity : get_vector (MELEE_UNIT))
         {
@@ -1179,8 +1180,56 @@ void game_step_t::make_atack_groups ()
           result->entityActions[entity.id] = EntityAction (moveAction, nullptr, atackAction, nullptr);
           game_step_t::attack_move_tasks[entity.id] = attack_pos[dir];
           make_busy (entity.id);
+          protect_l.erase (entity.id);
+          protect_r.erase (entity.id);
         }
     }
+}
+
+void game_step_t::make_protect_groups ()
+{
+  const int avg = (get_army_count () - game_step_t::attack_move_tasks.size ()) / 2;
+  for (auto it = protect_l.begin ();it != protect_l.end ();)
+    if (!m_entity_by_id.count (*it))
+      {
+        protect_l.erase (it);
+        it = protect_l.begin ();
+      }
+    else
+      ++it;
+  for (auto it = protect_r.begin ();it != protect_r.end ();)
+    if (!m_entity_by_id.count (*it))
+      {
+        protect_r.erase (it);
+        it = protect_r.begin ();
+      }
+    else
+      ++it;
+  for (const Entity &entity : get_vector (RANGED_UNIT))
+    {
+      if (is_busy (entity))
+        continue;
+      if (protect_l.size () < avg)
+        protect_l.insert (entity.id);
+      else
+        protect_r.insert (entity.id);
+    }
+  while (std::abs ((int)protect_l.size () - (int)protect_r.size ()) > 1)
+    {
+      if (protect_l.size () > protect_r.size ())
+        {
+          int id =  *protect_l.begin ();
+          protect_l.erase (id);
+          protect_r.insert (id);
+        }
+      else
+        {
+          int id = *protect_r.begin ();
+          protect_r.erase (id);
+          protect_l.insert (id);
+        }
+    }
+
 }
 
 

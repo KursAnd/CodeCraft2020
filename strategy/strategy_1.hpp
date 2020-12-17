@@ -25,7 +25,7 @@ void strategy_1 (const PlayerView& playerView, DebugInterface* debugInterface, A
   
   gs.train_unit (BUILDER_BASE);
   gs.train_unit (RANGED_BASE);
-  //gs.train_unit (MELEE_BASE);
+  gs.train_unit (MELEE_BASE);
 
   gs.try_build (BUILDER_BASE);
   gs.try_build (RANGED_BASE);
@@ -37,6 +37,7 @@ void strategy_1 (const PlayerView& playerView, DebugInterface* debugInterface, A
   gs.move_builders ();
   gs.run_tasks ();
   gs.make_atack_groups ();
+  gs.make_protect_groups ();
   gs.move_army (RANGED_UNIT);
   gs.move_army (MELEE_UNIT);
 
