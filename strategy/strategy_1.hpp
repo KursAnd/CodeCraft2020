@@ -12,14 +12,15 @@ void strategy_1 (const PlayerView& playerView, DebugInterface* debugInterface, A
 
   game_step_t gs (playerView, result);
 
+  gs.check_repair (BUILDER_BASE);
+  gs.check_repair (RANGED_BASE);
+  gs.check_repair (TURRET);
+
   gs.save_builders ();
   gs.heal_nearest ();
   gs.send_cleaners ();
 
-  gs.check_repair (BUILDER_BASE);
-  gs.check_repair (RANGED_BASE);
   gs.check_repair (MELEE_BASE);
-  gs.check_repair (TURRET);
   gs.check_repair (HOUSE);
   gs.check_repair (WALL);
   
