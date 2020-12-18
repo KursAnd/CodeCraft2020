@@ -12,8 +12,6 @@ private:
   const PlayerView *playerView;
   Action *result;
 
-  std::unordered_map<EntityType, std::vector<Vec2Int>> priority_places_for_building;
-  
   
   static std::unordered_set<int> destroyed_pos;
   static std::unordered_map<int, Vec2Int> attack_move_tasks;

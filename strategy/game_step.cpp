@@ -16,22 +16,6 @@ game_step_t::game_step_t (const PlayerView &_playerView, Action &_result)
     }
 
   {
-    std::unordered_map<EntityType, std::vector<Vec2Int>> &res = priority_places_for_building;
-    res[HOUSE]  = { {0, 0}, {4, 0}, {0, 4}, {7, 0}, {0, 7}, {10, 0}, {0, 10}, {13, 0}, {0, 13}, {11, 3}, {3, 11}, {16, 0}, {0, 16}, {11, 6}, {6, 11}, {13, 11}, {10, 11} };
-    res[TURRET] = { {15, 15}, {20, 8}, {8, 20}, {6, 20}, {20, 6}, {16, 13}, {13, 16}, {2, 20}, {20, 2}, {17, 11}, {11, 17}, {11, 19}, {19, 11}, {20, 0}, {0, 20} };
-    res[BUILDER_BASE] = { {5, 5} };
-    res[MELEE_BASE] = { {5, 15} };
-    res[RANGED_BASE] = { {15, 5} };
-    res[WALL] = { {22, 7}, {22, 8}, {7, 22}, {8, 22}, {22, 6}, {6, 22}, {22, 9}, {9, 22}, {22, 5}, {5, 22}, {22, 4}, {4, 22}, {21, 9}, {9, 21}, {17, 15}, {15, 17}, {17, 16}, {16, 17},
-      {18, 13}, {13, 18}, {18, 14}, {14, 18}, {19, 13}, {13, 19}, {20, 13}, {13, 20}, {21, 12}, {12, 21}, {21, 11}, {11, 21}, {22, 3}, {3, 22}, {22, 2}, {2, 22}, {22, 1}, {1, 22}, {22, 0}, {0, 22}};
-
-    // for safety in .at ()
-    res[BUILDER_UNIT] = {};
-    res[MELEE_UNIT] = {};
-    res[RANGED_UNIT] = {};
-    res[RESOURCE] = {};
-  }
-  {
     attack_pos = {{playerView->mapSize - 5, 5}, {playerView->mapSize - 5, playerView->mapSize - 5}, {5, playerView->mapSize - 5}};
   }
 
@@ -212,13 +196,35 @@ game_step_t::game_step_t (const PlayerView &_playerView, Action &_result)
 
 Vec2Int game_step_t::get_place_for (const EntityType type) const
 {
-  if (priority_places_for_building.at (type).size () > get_count (type))
+  if (type == HOUSE)
     {
-      for (const Vec2Int &vec2 : priority_places_for_building.at (type))
+      Vec2Int pos = INCORRECT_VEC2INT;
+      for (int l = 0; l < 10; ++l)
         {
-          if (is_empty_space_for_type (vec2, type))
-            return vec2;
+          for (int i = 0; i < l; ++i)
+            {
+              for (int j = 0; j < l; ++j)
+                {
+                  Vec2Int p = Vec2Int (1 + i * 4, 1 + j * 4);
+                  if (is_empty_space_for_type (p, type))
+                    {
+                      pos = p;
+                      break;
+                    }
+                }
+              if (is_correct (pos))
+                break;
+            }
+          if (is_correct (pos))
+            break;
+          Vec2Int p = Vec2Int (1 + l * 4, 1 + l * 4);
+          if (is_empty_space_for_type (p, type))
+            {
+              pos = p;
+              break;
+            }
         }
+      return pos;
     }
   return INCORRECT_VEC2INT;
 }
