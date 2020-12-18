@@ -299,7 +299,8 @@ bool game_step_t::need_build (const EntityType type) const
       case BUILDER_BASE:
       case RANGED_BASE :
       case MELEE_BASE  :
-        return get_count (type) == 0;
+        return get_count (type) == 0
+            && game_step_t::enemy_near_base_ids.empty ();
       default: break;
     }
   return false;
