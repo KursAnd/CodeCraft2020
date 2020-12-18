@@ -59,6 +59,7 @@ public:
   int get_army_count () const;
   int get_base_count () const;
   Vec2Int get_res_pos () const;
+  Vec2Int get_step_back_for_entity (const Entity &entity, const int level) const;
   std::vector<Entity> &get_vector (const EntityType type);
   const std::vector<Entity> &get_vector (const EntityType type) const;
   std::vector<Entity> &get_enemy_vector (const EntityType type);
@@ -109,7 +110,6 @@ public:
   void run_tasks ();
   void make_atack_groups ();
   void redirect_all_atack_move_tasks (const Vec2Int old_pos, const Vec2Int new_pos);
-
 
   int get_attack_pos_id_by_vec (const Vec2Int pos) const;
   int choose_atack_pos (const Vec2Int old_pos = Vec2Int (-1, -1));
