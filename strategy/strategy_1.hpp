@@ -42,7 +42,6 @@ void strategy_1 (const PlayerView& playerView, DebugInterface* debugInterface, A
   gs.move_builders ();
   gs.run_tasks ();
   gs.make_atack_groups ();
-  gs.make_protect_groups ();
   gs.move_army (RANGED_UNIT);
   gs.move_army (MELEE_UNIT);
 

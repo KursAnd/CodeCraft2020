@@ -1,6 +1,5 @@
 #include "game_step.hpp"
 
-std::unordered_set<int> game_step_t::protect_l, game_step_t::protect_r, game_step_t::protect_c;
 std::unordered_set<int> game_step_t::destroyed_pos;
 std::unordered_map<int, Vec2Int> game_step_t::attack_move_tasks;
 
@@ -1253,8 +1252,6 @@ void game_step_t::make_atack_groups ()
           result->entityActions[entity.id] = EntityAction (moveAction, nullptr, atackAction, nullptr);
           game_step_t::attack_move_tasks[entity.id] = attack_pos[dir];
           make_busy (entity.id);
-          protect_l.erase (entity.id);
-          protect_r.erase (entity.id);
         }
       for (const Entity &entity : get_vector (MELEE_UNIT))
         {
@@ -1268,58 +1265,9 @@ void game_step_t::make_atack_groups ()
           result->entityActions[entity.id] = EntityAction (moveAction, nullptr, atackAction, nullptr);
           game_step_t::attack_move_tasks[entity.id] = attack_pos[dir];
           make_busy (entity.id);
-          protect_l.erase (entity.id);
-          protect_r.erase (entity.id);
         }
     }
 }
-
-void game_step_t::make_protect_groups ()
-{
-  const int avg = (get_army_count () - game_step_t::attack_move_tasks.size ()) / 2;
-  for (auto it = protect_l.begin ();it != protect_l.end ();)
-    if (!m_entity_by_id.count (*it))
-      {
-        protect_l.erase (it);
-        it = protect_l.begin ();
-      }
-    else
-      ++it;
-  for (auto it = protect_r.begin ();it != protect_r.end ();)
-    if (!m_entity_by_id.count (*it))
-      {
-        protect_r.erase (it);
-        it = protect_r.begin ();
-      }
-    else
-      ++it;
-  for (const Entity &entity : get_vector (RANGED_UNIT))
-    {
-      if (is_busy (entity))
-        continue;
-      if (protect_l.size () < avg)
-        protect_l.insert (entity.id);
-      else
-        protect_r.insert (entity.id);
-    }
-  while (std::abs ((int)protect_l.size () - (int)protect_r.size ()) > 1)
-    {
-      if (protect_l.size () > protect_r.size ())
-        {
-          int id =  *protect_l.begin ();
-          protect_l.erase (id);
-          protect_r.insert (id);
-        }
-      else
-        {
-          int id = *protect_r.begin ();
-          protect_r.erase (id);
-          protect_l.insert (id);
-        }
-    }
-
-}
-
 
 void game_step_t::redirect_all_atack_move_tasks (const Vec2Int old_pos, const Vec2Int new_pos)
 {
