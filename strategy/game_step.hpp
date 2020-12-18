@@ -85,7 +85,6 @@ public:
   int get_distance_for_base (const int id_a, const Vec2Int &pos_b, const EntityType type_b, Vec2Int &best_pos) const;
   std::vector<Vec2Int> get_nearest_free_places_for_me (const int id_a, const int id_b) const;
   std::vector<Vec2Int> get_nearest_free_places_for_me (const int id_a, const Vec2Int pos, const EntityType type) const;
-  bool find_escape_way_for_workers (const EntityType type, const Vec2Int worker_pos, Vec2Int &safe_pos) const;
 
   int count_workers_to_repair (const EntityType type) const;
   
@@ -103,7 +102,6 @@ public:
   void attack_others ();
   void move_army (const EntityType type);
   void turn_on_turrets ();
-  void save_builders ();
   void heal_nearest ();
 
 

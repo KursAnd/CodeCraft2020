@@ -17,7 +17,6 @@ void strategy_1 (const PlayerView& playerView, DebugInterface* debugInterface, A
   gs.attack_out_zone ();
   gs.attack_others ();
 
-  gs.save_builders ();
   gs.heal_nearest ();
 
   gs.check_repair (BUILDER_BASE);

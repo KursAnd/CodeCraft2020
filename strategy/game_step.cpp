@@ -1101,32 +1101,6 @@ void game_step_t::turn_on_turrets ()
     }
 }
 
-void game_step_t::save_builders ()
-{
-  const EntityType type = BUILDER_UNIT;
-
-  for (const Entity &entity : get_vector (type))
-    {
-      if (is_busy (entity))
-        continue;
-
-      Vec2Int safe_pos = INCORRECT_VEC2INT;
-      if (   find_escape_way_for_workers (RANGED_UNIT, entity.position, safe_pos)
-          || find_escape_way_for_workers (MELEE_UNIT , entity.position, safe_pos))
-        {
-          std::shared_ptr<MoveAction>   moveAction   = std::shared_ptr<MoveAction> (new MoveAction (safe_pos, true, true));
-          std::shared_ptr<BuildAction>  buildAction  = nullptr;
-          std::shared_ptr<AttackAction> atackAction  = nullptr;
-          std::shared_ptr<RepairAction> repairAction = nullptr;
-
-          make_busy (entity.id);
-          map[safe_pos.x][safe_pos.y] = BUILDER_UNIT + 10; // hack 
-          // map_id[best_pos.x][best_pos.y] = entity->id; // TO-DO: I'm not sure in it
-          result->entityActions[entity.id] = EntityAction (moveAction, buildAction, atackAction, repairAction);
-        }
-    }
-}
-
 void game_step_t::heal_nearest ()
 {
   const EntityType healer_type = BUILDER_UNIT;
@@ -1165,72 +1139,6 @@ void game_step_t::heal_nearest ()
         }
     }
 }
-
-bool game_step_t::find_escape_way_for_workers (const EntityType type, const Vec2Int worker_pos, Vec2Int &safe_pos) const
-{
-  const int safe_range = playerView->entityProperties.at (type).attack->attackRange + 3;
-  const int l = 0, r = 1, d = 2, u = 3;
-  //                       l  r  d  u
-  std::vector<int> escape {0, 0, 0, 0};
-  for (const Entity &enemy : m_enemy.at (type))
-    {
-      if (get_distance (worker_pos, enemy.position) <= safe_range)
-        {
-          if (enemy.position.x > worker_pos.x) escape[l]++;
-          if (enemy.position.x < worker_pos.x) escape[r]++;
-          if (enemy.position.y > worker_pos.y) escape[d]++;
-          if (enemy.position.y < worker_pos.y) escape[u]++;
-        }
-    }
-
-  std::vector<Vec2Int> ways, bad_way, near_pos = {
-    Vec2Int (worker_pos.x - 1, worker_pos.y    ),
-    Vec2Int (worker_pos.x + 1, worker_pos.y    ),
-    Vec2Int (worker_pos.x    , worker_pos.y - 1),
-    Vec2Int (worker_pos.x    , worker_pos.y + 1)
-  };
-  ways.reserve (4);
-
-  auto choose_dir = [&] (const int l, const int u, const int d)
-    {
-      if (escape[l])
-        {
-          if (is_place_free (near_pos[l].x, near_pos[l].y))
-            {
-              ways.push_back (near_pos[l]);
-            }
-          else if (ways.empty () && bad_way.empty ())
-            {
-              if (!escape[u] && is_place_free (near_pos[d].x, near_pos[d].y))
-                bad_way.push_back (near_pos[d]);
-              else if (!escape[d] && is_place_free (near_pos[u].x, near_pos[u].y))
-                bad_way.push_back (near_pos[u]);
-            } 
-        }
-    };
-
-  choose_dir (l, u, d);
-  choose_dir (r, u, d);
-  choose_dir (d, l, r);
-  choose_dir (u, l, r);
-
-  if (!ways.empty ())
-    {
-      if (ways.size () == 4)
-        return false;
-
-      safe_pos = ways[rand () % ways.size ()];
-      return true;
-    }
-  if (!bad_way.empty ())
-    {
-      safe_pos = bad_way.back ();
-      return true;
-    }
-
-  return false;
-}
-
 
 void game_step_t::run_tasks ()
 {
