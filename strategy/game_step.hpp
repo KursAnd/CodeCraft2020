@@ -110,6 +110,7 @@ public:
   void save_builders ();
   void heal_nearest ();
   void send_cleaners ();
+  void send_builde_to_tree (const Entity &entity);
 
 
   void run_tasks ();

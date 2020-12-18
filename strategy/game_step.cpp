@@ -258,7 +258,7 @@ bool game_step_t::need_build (const EntityType type) const
                              && !game_step_t::enemy_near_base_ids.empty ();
 
       case HOUSE       :
-        return (get_count (BUILDER_UNIT) >= MIN_BUILDER_UNITS || m_population_use < MIN_BUILDER_UNITS)
+        return (get_count (BUILDER_UNIT) >= MIN_BUILDER_UNITS || m_population_max < MIN_BUILDER_UNITS + 5)
             && m_population_use + 10 >= m_population_max_future
             && get_count (BUILDER_BASE) > 0
             && (get_count (RANGED_BASE) > 0 || get_count (MELEE_BASE) > 0 || m_population_max < MIN_BUILDER_UNITS * 2);
@@ -780,13 +780,7 @@ void game_step_t::move_builders ()
     {
       if (is_busy (entity))
         continue;
-
-      std::shared_ptr<MoveAction>   moveAction   = std::shared_ptr<MoveAction> (new MoveAction (get_res_pos (), true, true));
-      std::shared_ptr<BuildAction>  buildAction  = nullptr;
-      std::shared_ptr<AttackAction> atackAction  = std::shared_ptr<AttackAction> (new AttackAction (nullptr, std::shared_ptr<AutoAttack> (new AutoAttack (properties.sightRange, {RESOURCE}))));
-      std::shared_ptr<RepairAction> repairAction = nullptr;
-
-      result->entityActions[entity.id] = EntityAction (moveAction, buildAction, atackAction, repairAction);
+      send_builde_to_tree (entity);
     }
 }
 
@@ -1082,14 +1076,15 @@ void game_step_t::send_cleaners ()
     return;
   if (cleaner_lvs.size () == 2 && m_population_max > 5)
     cleaner_lvs.push_back (cleaner_lvs.back ());
+  const EntityType type = BUILDER_UNIT;
+  const EntityProperties &properties = playerView->entityProperties.at (type);
   for (int cleaner_id = 0; cleaner_id < game_step_t::cleaner_lvs.size (); ++cleaner_id)
     {
       const Vec2Int pos = get_cleaner_aim (cleaner_id);
       if (pos.x < 0)
         return;
 
-      const EntityType type = BUILDER_UNIT;
-      const EntityProperties &properties = playerView->entityProperties.at (type);
+      
 
       for (const Entity &entity : get_vector (type))
         {
@@ -1135,6 +1130,16 @@ void game_step_t::save_builders ()
           result->entityActions[entity.id] = EntityAction (moveAction, buildAction, atackAction, repairAction);
         }
     }
+}
+
+void game_step_t::send_builde_to_tree (const Entity &entity)
+{
+  const EntityProperties &properties = playerView->entityProperties.at (BUILDER_UNIT);
+  std::shared_ptr<MoveAction>   moveAction   = std::shared_ptr<MoveAction> (new MoveAction (get_res_pos (), true, true));
+  std::shared_ptr<AttackAction> atackAction  = std::shared_ptr<AttackAction> (new AttackAction (nullptr, std::shared_ptr<AutoAttack> (new AutoAttack (properties.sightRange, {RESOURCE}))));
+
+  make_busy (entity);
+  result->entityActions[entity.id] = EntityAction (moveAction, nullptr, atackAction, nullptr);
 }
 
 void game_step_t::heal_nearest ()
