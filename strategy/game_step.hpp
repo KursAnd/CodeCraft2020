@@ -102,6 +102,7 @@ public:
   void check_repair (const EntityType repairType);
   void move_builders ();
   void attack_in_zone ();
+  void attack_step_back ();
   void attack_out_zone ();
   void attack_others ();
   void move_army (const EntityType type);

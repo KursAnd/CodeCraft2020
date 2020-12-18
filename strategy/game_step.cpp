@@ -4,7 +4,7 @@ std::unordered_set<int> game_step_t::protect_l, game_step_t::protect_r, game_ste
 std::unordered_set<int> game_step_t::destroyed_pos;
 std::unordered_map<int, Vec2Int> game_step_t::attack_move_tasks;
 
-std::vector<int> game_step_t::cleaner_lvs = {0, 0};
+std::vector<int> game_step_t::cleaner_lvs = {0, 3};
 
 game_step_t::game_step_t (const PlayerView &_playerView, Action &_result)
   : playerView (&_playerView), result (&_result),
@@ -38,9 +38,10 @@ game_step_t::game_step_t (const PlayerView &_playerView, Action &_result)
   }
   {
     cleaner_aims = {
-        {RANGED_BASE, 0},
         {BUILDER_BASE, 0},
-                                  {HOUSE, 0}, {HOUSE, 1}, {HOUSE, 2}, {HOUSE, 3}, {HOUSE, 4},
+                                  {HOUSE, 0}, {HOUSE, 1},
+        {RANGED_BASE, 0},
+                          {HOUSE, 2}, {HOUSE, 3}, {HOUSE, 4},
         {MELEE_BASE, 0},
         {TURRET, 0}, {TURRET, 1},
                                   {HOUSE, 5}, {HOUSE, 6}, {HOUSE, 7}, {HOUSE, 8}, {HOUSE, 9},
@@ -265,7 +266,8 @@ bool game_step_t::need_build (const EntityType type) const
             && m_population_use > 25
             && 1.0 * m_population_use / m_population_max > 0.65
             && get_count (BUILDER_BASE) > 0
-            && get_count (RANGED_BASE) > 0;
+            && get_count (RANGED_BASE) > 0
+            && get_count (TURRET) <= 6;
       case WALL        :
         return get_count (BUILDER_UNIT) >= MIN_BUILDER_UNITS
             && m_population_use > 30
@@ -872,6 +874,46 @@ void game_step_t::attack_in_zone ()
     }
 }
 
+void game_step_t::attack_step_back ()
+{
+  for (const EntityType type : {RANGED_UNIT/*, MELEE_UNIT*/, BUILDER_UNIT})
+    {
+      const EntityProperties &prop = playerView->entityProperties.at (type);
+      for (const Entity &entity : get_vector (type))
+        {
+          if (is_busy (entity))
+            continue;
+          if (type == RANGED_UNIT && entity.position.x <= 20 && entity.position.y <= 20)
+            continue;
+          Vec2Int pos = entity.position;
+          if (map_run[pos.x][pos.y] != 2 || (map_run[pos.x][pos.y] != 3 && type == BUILDER_UNIT))
+            continue;
+          
+          Vec2Int best_pos = INCORRECT_VEC2INT;
+          std::vector<Vec2Int> best_poses[2];
+          for (const Vec2Int p : {Vec2Int (pos.x    , pos.y - 1), Vec2Int (pos.x - 1, pos.y    ),
+                                  Vec2Int (pos.x + 1, pos.y    ), Vec2Int (pos.x    , pos.y + 1)})
+            {
+              if (is_place_free (p) && map_run[p.x][p.y] < 2)
+                best_poses[map_run[p.x][p.y]].push_back (p);
+            }
+          for (int i = 0; i < 2; ++ i)
+            if (!best_poses[i].empty ())
+              {
+                best_pos = best_poses[i][rand () % best_poses[i].size ()];
+                break;
+              }
+          if (is_correct (best_pos))
+            {
+              std::shared_ptr<MoveAction>   moveAction   = std::shared_ptr<MoveAction> (new MoveAction (best_pos, true, false));
+              result->entityActions[entity.id] = EntityAction (moveAction, nullptr, nullptr, nullptr);
+              make_busy (entity.id);
+              map[best_pos.x][best_pos.y] = entity.entityType + 10;
+            }
+        }
+    }
+}
+
 void game_step_t::attack_out_zone ()
 {
   const EntityType type = RANGED_UNIT;
@@ -938,49 +980,6 @@ void game_step_t::attack_out_zone ()
   }
   ////          ATTACK TURRET IF CAN            ////
   //////////////////////////////////////////////////
-
-  ////////////////////////////////////////////////////////////
-  ////          RUN AWAY FROM EVERYONE IF NEED            ////
-  for (const Entity &arch : get_vector (type))
-    {
-      if (   is_busy (arch)
-          || map_damage[arch.position.x][arch.position.y] != 0
-          || (arch.position.x <= MY_BASE_ZONE && arch.position.y <= MY_BASE_ZONE))
-        continue;
-
-      auto is_safe_area = [&] (const Vec2Int pos)
-        {
-          std::vector<Vec2Int> poses = {Vec2Int (pos.x    , pos.y - 1), Vec2Int (pos.x - 1, pos.y    ),
-                                        Vec2Int (pos.x + 1, pos.y    ), Vec2Int (pos.x    , pos.y + 1)};
-          for (const Vec2Int p : poses)
-            if (is_correct (p) && map_damage[p.x][p.y] > 0)
-              return false;
-          return true;
-        };
-      if (!is_safe_area (arch.position))
-        {
-          Vec2Int best_pos = INCORRECT_VEC2INT;
-          std::vector<Vec2Int> poses = {Vec2Int (arch.position.x    , arch.position.y - 1), Vec2Int (arch.position.x - 1, arch.position.y    ),
-                                        Vec2Int (arch.position.x + 1, arch.position.y    ), Vec2Int (arch.position.x    , arch.position.y + 1)};
-          for (const Vec2Int p : poses)
-            {
-              if (is_place_free (p) && is_safe_area (p))
-                {
-                  best_pos = p;
-                  break;
-                }
-            }
-          if (best_pos.x != -1)
-            {
-              std::shared_ptr<MoveAction>   moveAction   = std::shared_ptr<MoveAction> (new MoveAction (best_pos, true, false));
-              result->entityActions[arch.id] = EntityAction (moveAction, nullptr, nullptr, nullptr);
-              make_busy (arch.id);
-              map[best_pos.x][best_pos.y] = RANGED_UNIT + 10;
-            }
-        }
-    }
-  ////          RUN AWAY FROM EVERYONE IF NEED            ////
-  ////////////////////////////////////////////////////////////
 }
 
 void game_step_t::attack_others ()
@@ -1271,9 +1270,11 @@ void game_step_t::run_tasks ()
       if (!is_busy (id))
         {
           const EntityProperties &properties = playerView->entityProperties.at (m_entity_by_id[id].entityType);
-          std::shared_ptr<MoveAction>   moveAction   = std::shared_ptr<MoveAction> (new MoveAction (pos, true, true));;
+          std::shared_ptr<MoveAction>   moveAction   = nullptr;
           std::shared_ptr<AttackAction> atackAction  = std::shared_ptr<AttackAction> (new AttackAction (nullptr, std::shared_ptr<AutoAttack> (new AutoAttack (properties.sightRange, {}))));
-      
+
+          if (map_run[entity.position.x][entity.position.y] == 0)
+            moveAction = std::shared_ptr<MoveAction> (new MoveAction (pos, true, true));
           result->entityActions[entity.id] = EntityAction (moveAction, nullptr, atackAction, nullptr);
           make_busy (id);
         }

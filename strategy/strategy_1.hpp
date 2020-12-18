@@ -11,7 +11,8 @@ void strategy_1 (const PlayerView& playerView, DebugInterface* debugInterface, A
     }
 
   game_step_t gs (playerView, result);
-
+  
+  gs.attack_step_back ();
   gs.attack_in_zone ();
   gs.attack_out_zone ();
   gs.attack_others ();
@@ -33,10 +34,10 @@ void strategy_1 (const PlayerView& playerView, DebugInterface* debugInterface, A
 
   gs.try_build (BUILDER_BASE);
   gs.try_build (RANGED_BASE);
-  gs.try_build (MELEE_BASE);
+  //gs.try_build (MELEE_BASE);
   gs.try_build (HOUSE);
   gs.try_build (TURRET);
-  gs.try_build (WALL);
+  //gs.try_build (WALL);
 
 
   gs.move_builders ();
