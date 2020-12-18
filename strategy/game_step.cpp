@@ -1461,34 +1461,3 @@ int game_step_t::choose_atack_pos (const Vec2Int old_pos)
 
   return dir;
 }
-
-bool game_step_t::get_pos_for_safe_operation (const EntityType type, Vec2Int &pos) const
-{
-  bool attacked = false;
-  const EntityProperties &properties = playerView->entityProperties.at (type);
-  if (get_count (type) == 0)
-    {
-      if (type == BUILDER_BASE || type == MELEE_BASE || type == RANGED_BASE)
-        {
-          pos = priority_places_for_building.at (type)[0];
-          pos.x += properties.size / 2 + rand () % properties.size;
-          pos.y += properties.size / 2 + rand () % properties.size;
-          attacked = true;
-        }
-    }
-  else
-    {
-      for (const Entity &entity : get_vector (type))
-        {
-          if (entity.active && entity.health < properties.maxHealth)
-            {
-              pos = entity.position;
-              pos.x += properties.size / 2 + rand () % properties.size;
-              pos.y += properties.size / 2 + rand () % properties.size;
-              attacked = true;
-              break;
-            }
-        }
-    }
-  return attacked;
-}
