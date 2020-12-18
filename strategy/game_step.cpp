@@ -772,7 +772,37 @@ void game_step_t::move_builders ()
     {
       if (is_busy (entity))
         continue;
-      send_builde_to_tree (entity);
+
+      Entity *aim_tree = nullptr;
+      int dis = get_max_distance ();
+      for (Entity &tree : get_vector (RESOURCE))
+        {
+          if (tree_was.count (tree.id))
+            continue;
+          int temp_dis = get_distance (entity.position, tree.position);
+          if (dis > temp_dis)
+            {
+              dis = temp_dis;
+              aim_tree = &tree;
+            }
+        }
+
+      std::shared_ptr<MoveAction>   moveAction   = nullptr;
+      std::shared_ptr<AttackAction> atackAction  = nullptr;
+      if (aim_tree)
+        {
+          moveAction  = std::shared_ptr<MoveAction> (new MoveAction (aim_tree->position, true, true));
+          atackAction = std::shared_ptr<AttackAction> (new AttackAction (std::shared_ptr<int> (new int (aim_tree->id)), nullptr));
+          tree_was.insert (aim_tree->id);
+        }
+      else
+        {
+          moveAction  = std::shared_ptr<MoveAction> (new MoveAction (Vec2Int (rand () % playerView->mapSize, rand() % playerView->mapSize), true, true));
+          atackAction = std::shared_ptr<AttackAction> (new AttackAction (nullptr, std::shared_ptr<AutoAttack> (new AutoAttack (properties.sightRange, {WALL, HOUSE, BUILDER_BASE, BUILDER_UNIT, MELEE_BASE,  MELEE_UNIT, RANGED_BASE, RANGED_UNIT, RESOURCE, TURRET}))));
+        }
+
+      make_busy (entity.id);
+      result->entityActions[entity.id] = EntityAction (moveAction, nullptr, atackAction, nullptr);
     }
 }
 
@@ -1124,16 +1154,6 @@ void game_step_t::save_builders ()
     }
 }
 
-void game_step_t::send_builde_to_tree (const Entity &entity)
-{
-  const EntityProperties &properties = playerView->entityProperties.at (BUILDER_UNIT);
-  std::shared_ptr<MoveAction>   moveAction   = std::shared_ptr<MoveAction> (new MoveAction (get_res_pos (), true, true));
-  std::shared_ptr<AttackAction> atackAction  = std::shared_ptr<AttackAction> (new AttackAction (nullptr, std::shared_ptr<AutoAttack> (new AutoAttack (properties.sightRange, {RESOURCE}))));
-
-  make_busy (entity);
-  result->entityActions[entity.id] = EntityAction (moveAction, nullptr, atackAction, nullptr);
-}
-
 void game_step_t::heal_nearest ()
 {
   const EntityType healer_type = BUILDER_UNIT;
@@ -1290,7 +1310,7 @@ void game_step_t::run_tasks ()
 
 void game_step_t::make_atack_groups ()
 {
-  if ((get_army_count () - game_step_t::attack_move_tasks.size () > 15 || (!game_step_t::destroyed_pos.empty () && get_count (TURRET) >= 3))
+  if ((get_army_count () - game_step_t::attack_move_tasks.size () > 15 || !game_step_t::destroyed_pos.empty ())
     && enemy_near_base_ids.empty ())
     {
       int dir = choose_atack_pos ();

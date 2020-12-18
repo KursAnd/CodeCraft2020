@@ -35,6 +35,7 @@ private:
   int m_population_max_future = 0; // include inactive houses
   int m_population_use = 0;
 
+  std::unordered_set<int> tree_was;
   Vec2Int m_res_pos;  // purpouse for BUILDERs who collect thr resources
   const Vec2Int INCORRECT_VEC2INT = Vec2Int(-1, -1);
 
@@ -110,7 +111,6 @@ public:
   void save_builders ();
   void heal_nearest ();
   void send_cleaners ();
-  void send_builde_to_tree (const Entity &entity);
 
 
   void run_tasks ();
