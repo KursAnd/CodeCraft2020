@@ -249,36 +249,28 @@ bool game_step_t::need_build (const EntityType type) const
                                  || (get_count (BUILDER_UNIT) < MIN_BUILDER_UNITS * 2 && !can_build (RANGED_UNIT))
                                  || (get_count (BUILDER_UNIT) < MIN_BUILDER_UNITS * 2 && get_count (RANGED_UNIT) > MIN_BUILDER_UNITS && get_count (RESOURCE) > MIN_BUILDER_UNITS))
                              && !builders_is_attakers;
-      case RANGED_UNIT : return get_count (BUILDER_UNIT) >= MIN_BUILDER_UNITS || playerView->currentTick > 200;
-      case MELEE_UNIT  : return (get_count (BUILDER_UNIT) >= MIN_BUILDER_UNITS || playerView->currentTick > 200)
-                             && (   (m_population_use <  40                          && get_count (MELEE_UNIT)     < get_count (RANGED_UNIT)    )
-                                 || (m_population_use >= 40 && m_population_use < 80 && get_count (MELEE_UNIT) * 3 < get_count (RANGED_UNIT) * 2)
-                                 || (m_population_max >= 80                          && get_count (MELEE_UNIT)     < get_count (RANGED_UNIT) * 2)
-                                 || !can_build (RANGED_UNIT))
-                             && !game_step_t::enemy_near_base_ids.empty ();
+      case RANGED_UNIT : return get_count (BUILDER_UNIT) >= MIN_BUILDER_UNITS || !game_step_t::enemy_near_base_ids.empty ();
+      case MELEE_UNIT  : return !can_build (RANGED_UNIT) && !game_step_t::enemy_near_base_ids.empty ();
 
       case HOUSE       :
-        return (get_count (BUILDER_UNIT) >= MIN_BUILDER_UNITS || m_population_max < MIN_BUILDER_UNITS + 5)
-            && m_population_use + 10 >= m_population_max_future
-            && get_count (BUILDER_BASE) > 0
-            && (get_count (RANGED_BASE) > 0 || get_count (MELEE_BASE) > 0 || m_population_max < MIN_BUILDER_UNITS * 2);
+        return m_population_use + 10 > m_population_max_future
+            && (get_count (RANGED_BASE) > 0 || get_count (BUILDER_UNIT) < MIN_BUILDER_UNITS * 2)
+            && game_step_t::enemy_near_base_ids.empty ();
       case TURRET      :
         return get_count (BUILDER_UNIT) >= MIN_BUILDER_UNITS
-            && m_population_max > 30
-            && m_population_use > 25
+            && m_population_use > 30
             && 1.0 * m_population_use / m_population_max > 0.65
             && get_count (BUILDER_BASE) > 0
             && get_count (RANGED_BASE) > 0
-            && get_count (TURRET) < 6;
+            && get_count (TURRET) < 6
+            && game_step_t::enemy_near_base_ids.empty ();
       case WALL        :
         return get_count (BUILDER_UNIT) >= MIN_BUILDER_UNITS
             && m_population_use > 30
-            && (   get_count (WALL) < 2
-                || (   get_count (TURRET) > 3
-                    && get_count (WALL) * 2 < get_count (TURRET) * 3
-                    && 1.0 * m_population_use / m_population_max > 0.7))
+            && 1.0 * m_population_use / m_population_max > 0.7
             && get_count (BUILDER_BASE) > 0
-            && get_count (RANGED_BASE) > 0;
+            && get_count (RANGED_BASE) > 0
+            && game_step_t::enemy_near_base_ids.empty ();
 
       case BUILDER_BASE:
       case RANGED_BASE :
@@ -617,11 +609,11 @@ std::vector<Vec2Int> game_step_t::get_nearest_free_places_for_me (const int id_w
         res.push_back (Vec2Int (x, pos.y - 1));
   if (pos.x < playerView->mapSize - 1)
     for (int y = pos.y; y < pos.y + properties.size; ++y)
-      if (is_place_free_or_my (pos.x + properties.size, y, id_worker) && map_run[pos.x + properties.size][y])
+      if (is_place_free_or_my (pos.x + properties.size, y, id_worker) && map_run[pos.x + properties.size][y] == 0)
         res.push_back (Vec2Int (pos.x + properties.size, y));
   if (pos.x < playerView->mapSize - 1)
     for (int x = pos.x; x < pos.x + properties.size; ++x)
-      if (is_place_free_or_my (x, pos.y + properties.size, id_worker) && map_run[x][pos.y + properties.size])
+      if (is_place_free_or_my (x, pos.y + properties.size, id_worker) && map_run[x][pos.y + properties.size] == 0)
         res.push_back (Vec2Int (x, pos.y + properties.size));
   return std::move (res);
 }
