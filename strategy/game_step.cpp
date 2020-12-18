@@ -20,7 +20,7 @@ game_step_t::game_step_t (const PlayerView &_playerView, Action &_result)
   {
     std::unordered_map<EntityType, std::vector<Vec2Int>> &res = priority_places_for_building;
     res[HOUSE]  = { {0, 0}, {4, 0}, {0, 4}, {7, 0}, {0, 7}, {10, 0}, {0, 10}, {13, 0}, {0, 13}, {11, 3}, {3, 11}, {16, 0}, {0, 16}, {11, 6}, {6, 11}, {13, 11}, {10, 11} };
-    res[TURRET] = { {15, 15}, {20, 7}, {7, 20}, {5, 20}, {20, 5}, {16, 13}, {13, 16}, {2, 20}, {20, 2}, {17, 11}, {11, 17}, {11, 19}, {19, 11}, {20, 0}, {0, 20} };
+    res[TURRET] = { {15, 15}, {20, 8}, {8, 20}, {6, 20}, {20, 6}, {16, 13}, {13, 16}, {2, 20}, {20, 2}, {17, 11}, {11, 17}, {11, 19}, {19, 11}, {20, 0}, {0, 20} };
     res[BUILDER_BASE] = { {5, 5} };
     res[MELEE_BASE] = { {5, 15} };
     res[RANGED_BASE] = { {15, 5} };
@@ -269,7 +269,7 @@ bool game_step_t::need_build (const EntityType type) const
             && 1.0 * m_population_use / m_population_max > 0.65
             && get_count (BUILDER_BASE) > 0
             && get_count (RANGED_BASE) > 0
-            && get_count (TURRET) <= 6;
+            && get_count (TURRET) < 6;
       case WALL        :
         return get_count (BUILDER_UNIT) >= MIN_BUILDER_UNITS
             && m_population_use > 30
@@ -495,8 +495,8 @@ int game_step_t::get_build_to_build_distance (const Entity &a, const Entity &b) 
   for (int x = a.position.x; x < a.position.x + prop_a.size; ++x)
     for (int y = a.position.y; y < a.position.y + prop_b.size; ++y)
       {
-        for (int q = a.position.x; q < a.position.x + prop_a.size; ++q)
-          for (int p = a.position.y; p < a.position.y + prop_b.size; ++p)
+        for (int q = b.position.x; q < b.position.x + prop_a.size; ++q)
+          for (int p = b.position.y; p < b.position.y + prop_b.size; ++p)
             dist = std::min (dist, get_distance (Vec2Int (x, y), Vec2Int (q, p)));
       }
   return dist;
@@ -867,6 +867,8 @@ void game_step_t::attack_in_zone ()
           std::unordered_set<int> &our_ids = it->second;
           for (const int id : our_ids)
             {
+              if (is_busy (id))
+                continue;
               std::shared_ptr<AttackAction> atackAction  = std::shared_ptr<AttackAction> (new AttackAction (std::shared_ptr<int> (new int (enemy_id)), nullptr));
               result->entityActions[id] = EntityAction (nullptr, nullptr, atackAction, nullptr);
               make_busy (id);
