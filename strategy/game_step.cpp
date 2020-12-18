@@ -4,7 +4,6 @@ std::unordered_set<int> game_step_t::protect_l, game_step_t::protect_r, game_ste
 std::unordered_set<int> game_step_t::destroyed_pos;
 std::unordered_map<int, Vec2Int> game_step_t::attack_move_tasks;
 
-std::vector<int> game_step_t::cleaner_lvs = {0, 3};
 
 game_step_t::game_step_t (const PlayerView &_playerView, Action &_result)
   : playerView (&_playerView), result (&_result),
@@ -35,20 +34,6 @@ game_step_t::game_step_t (const PlayerView &_playerView, Action &_result)
   }
   {
     attack_pos = {{playerView->mapSize - 5, 5}, {playerView->mapSize - 5, playerView->mapSize - 5}, {5, playerView->mapSize - 5}};
-  }
-  {
-    cleaner_aims = {
-        {BUILDER_BASE, 0},
-                                  {HOUSE, 0}, {HOUSE, 1},
-        {RANGED_BASE, 0},
-                          {HOUSE, 2}, {HOUSE, 3}, {HOUSE, 4},
-        {MELEE_BASE, 0},
-        {TURRET, 0}, {TURRET, 1},
-                                  {HOUSE, 5}, {HOUSE, 6}, {HOUSE, 7}, {HOUSE, 8}, {HOUSE, 9},
-        {TURRET, 2}, {TURRET, 3},
-                                  {HOUSE, 10}, {HOUSE, 11}, {HOUSE, 16},
-        {TURRET, 4}, {TURRET, 5}, {TURRET, 6}, {TURRET, 14}
-    };
   }
 
   m_id = playerView->myId;
@@ -521,30 +506,6 @@ bool game_step_t::is_correct (const Vec2Int pos) const
 bool game_step_t::is_correct_xy (const int x, const int y) const
 {
   return x >= 0 && y >= 0 && x < playerView->mapSize && y < playerView->mapSize;
-}
-
-Vec2Int game_step_t::get_cleaner_aim (const int cleaner_id) const
-{
-  if (game_step_t::cleaner_lvs[cleaner_id] >= game_step_t::cleaner_aims.size ())
-    return INCORRECT_VEC2INT;
-  while (game_step_t::cleaner_lvs[cleaner_id] < game_step_t::cleaner_aims.size ())
-    {
-      const EntityType type = game_step_t::cleaner_aims.at (game_step_t::cleaner_lvs[cleaner_id]).first;
-      const int lv          = game_step_t::cleaner_aims.at (game_step_t::cleaner_lvs[cleaner_id]).second;
-      const Vec2Int pos = priority_places_for_building.at (type).at (lv);
-      const EntityProperties &properties = playerView->entityProperties.at (type);
-      if (!is_place_contain (pos.x, pos.y, type))
-        {
-          for (int x = pos.x; x < pos.x + properties.size; ++x)
-            for (int y = pos.y; y < pos.y + properties.size; ++y)
-              {
-                if (is_place_contain (x, y, RESOURCE) || map[x][y] == 100)
-                  return Vec2Int (x, y);
-              }
-        }
-      game_step_t::cleaner_lvs[cleaner_id]++;      
-    }
-  return INCORRECT_VEC2INT;
 }
 
 int game_step_t::get_distance_for_base (const int id_a, const Vec2Int &pos_b, const EntityType type_b, Vec2Int &best_pos) const
@@ -1089,42 +1050,6 @@ void game_step_t::turn_on_turrets ()
       std::shared_ptr<RepairAction> repairAction = nullptr;
 
       result->entityActions[entity.id] = EntityAction (moveAction, buildAction, atackAction, repairAction);
-    }
-}
-
-void game_step_t::send_cleaners ()
-{
-  if (get_count (BUILDER_UNIT) < 3)
-    return;
-  if (cleaner_lvs.size () == 2 && m_population_max > 5)
-    cleaner_lvs.push_back (cleaner_lvs.back ());
-  const EntityType type = BUILDER_UNIT;
-  const EntityProperties &properties = playerView->entityProperties.at (type);
-  for (int cleaner_id = 0; cleaner_id < game_step_t::cleaner_lvs.size (); ++cleaner_id)
-    {
-      const Vec2Int pos = get_cleaner_aim (cleaner_id);
-      if (pos.x < 0)
-        return;
-
-      
-
-      for (const Entity &entity : get_vector (type))
-        {
-          if (is_busy (entity))
-            continue;
-
-          std::shared_ptr<MoveAction>   moveAction   = std::shared_ptr<MoveAction> (new MoveAction (pos, false, true));
-          std::shared_ptr<BuildAction>  buildAction  = nullptr;
-          std::shared_ptr<AttackAction> atackAction  = nullptr;
-          std::shared_ptr<RepairAction> repairAction = nullptr;
-
-          if (map_id[pos.x][pos.y] >= 0)
-            atackAction = std::shared_ptr<AttackAction> (new AttackAction (std::shared_ptr<int> (new int (map_id[pos.x][pos.y])), nullptr));
-
-          make_busy (entity.id);
-          result->entityActions[entity.id] = EntityAction (moveAction, buildAction, atackAction, repairAction);
-          break;
-        }
     }
 }
 

@@ -19,7 +19,6 @@ void strategy_1 (const PlayerView& playerView, DebugInterface* debugInterface, A
 
   gs.save_builders ();
   gs.heal_nearest ();
-  gs.send_cleaners ();
 
   gs.check_repair (BUILDER_BASE);
   gs.check_repair (RANGED_BASE);

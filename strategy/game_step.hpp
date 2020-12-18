@@ -21,8 +21,6 @@ private:
   std::vector<Vec2Int> attack_pos;
 
 
-  static std::vector<int> cleaner_lvs;
-  std::vector<std::pair<EntityType, int>> cleaner_aims;
   bool builders_is_attakers = false;
 
   const int MIN_BUILDER_UNITS = 15;
@@ -80,7 +78,6 @@ public:
   bool is_correct (const Vec2Int pos) const;
   bool is_correct_xy (const int x, const int y) const;
 
-  Vec2Int get_cleaner_aim (const int cleaner_id) const;
   int get_max_distance () const;
   void get_nearest_worker_and_best_pos (const Vec2Int build_pos, const EntityType buildType, const Entity *&entity, Vec2Int &best_pos) const;
   static int get_distance (const Vec2Int pos_a, const Vec2Int pos_b);
@@ -110,7 +107,6 @@ public:
   void turn_on_turrets ();
   void save_builders ();
   void heal_nearest ();
-  void send_cleaners ();
 
 
   void run_tasks ();
