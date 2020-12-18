@@ -246,14 +246,16 @@ bool game_step_t::need_build (const EntityType type) const
   switch (type)
     {
       case BUILDER_UNIT: return (   get_count (BUILDER_UNIT) < std::max (MIN_BUILDER_UNITS, m_population_max * 4 / 10)
-                                 || (get_count (BUILDER_UNIT) < MIN_BUILDER_UNITS * 2 && !can_build (RANGED_UNIT)))
+                                 || (get_count (BUILDER_UNIT) < MIN_BUILDER_UNITS * 2 && !can_build (RANGED_UNIT))
+                                 || (get_count (BUILDER_UNIT) < MIN_BUILDER_UNITS * 2 && get_count (RANGED_UNIT) > MIN_BUILDER_UNITS && get_count (RESOURCE) > MIN_BUILDER_UNITS))
                              && !builders_is_attakers;
-      case RANGED_UNIT : return get_count (BUILDER_UNIT) >= MIN_BUILDER_UNITS;
-      case MELEE_UNIT  : return get_count (BUILDER_UNIT) >= MIN_BUILDER_UNITS
+      case RANGED_UNIT : return get_count (BUILDER_UNIT) >= MIN_BUILDER_UNITS || playerView->currentTick > 200;
+      case MELEE_UNIT  : return (get_count (BUILDER_UNIT) >= MIN_BUILDER_UNITS || playerView->currentTick > 200)
                              && (   (m_population_use <  40                          && get_count (MELEE_UNIT)     < get_count (RANGED_UNIT)    )
                                  || (m_population_use >= 40 && m_population_use < 80 && get_count (MELEE_UNIT) * 3 < get_count (RANGED_UNIT) * 2)
                                  || (m_population_max >= 80                          && get_count (MELEE_UNIT)     < get_count (RANGED_UNIT) * 2)
-                                 || !can_build (RANGED_UNIT));
+                                 || !can_build (RANGED_UNIT))
+                             && !game_step_t::enemy_near_base_ids.empty ();
 
       case HOUSE       :
         return (get_count (BUILDER_UNIT) >= MIN_BUILDER_UNITS || m_population_use < MIN_BUILDER_UNITS)
@@ -607,19 +609,19 @@ std::vector<Vec2Int> game_step_t::get_nearest_free_places_for_me (const int id_w
   res.reserve (static_cast<size_t> (properties.size) * 4ll);
   if (pos.x > 0)
     for (int y = pos.y; y < pos.y + properties.size; ++y)
-      if (is_place_free_or_my (pos.x - 1, y, id_worker))
+      if (is_place_free_or_my (pos.x - 1, y, id_worker) && map_run[pos.x - 1][y] == 0)
         res.push_back (Vec2Int (pos.x - 1, y));
   if (pos.y > 0)
     for (int x = pos.x; x < pos.x + properties.size; ++x)
-      if (is_place_free_or_my (x, pos.y - 1, id_worker))
+      if (is_place_free_or_my (x, pos.y - 1, id_worker) && map_run[x][pos.y - 1] == 0)
         res.push_back (Vec2Int (x, pos.y - 1));
   if (pos.x < playerView->mapSize - 1)
     for (int y = pos.y; y < pos.y + properties.size; ++y)
-      if (is_place_free_or_my (pos.x + properties.size, y, id_worker))
+      if (is_place_free_or_my (pos.x + properties.size, y, id_worker) && map_run[pos.x + properties.size][y])
         res.push_back (Vec2Int (pos.x + properties.size, y));
   if (pos.x < playerView->mapSize - 1)
     for (int x = pos.x; x < pos.x + properties.size; ++x)
-      if (is_place_free_or_my (x, pos.y + properties.size, id_worker))
+      if (is_place_free_or_my (x, pos.y + properties.size, id_worker) && map_run[x][pos.y + properties.size])
         res.push_back (Vec2Int (x, pos.y + properties.size));
   return std::move (res);
 }
@@ -1074,6 +1076,8 @@ void game_step_t::turn_on_turrets ()
 
 void game_step_t::send_cleaners ()
 {
+  if (get_count (BUILDER_UNIT) < 3)
+    return;
   if (cleaner_lvs.size () == 2 && m_population_max > 5)
     cleaner_lvs.push_back (cleaner_lvs.back ());
   for (int cleaner_id = 0; cleaner_id < game_step_t::cleaner_lvs.size (); ++cleaner_id)
