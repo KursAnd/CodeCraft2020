@@ -226,6 +226,40 @@ Vec2Int game_step_t::get_place_for (const EntityType type) const
         }
       return pos;
     }
+  else if (type == RANGED_BASE)
+    {
+      Vec2Int pos = INCORRECT_VEC2INT;
+      for (int l = 0; l < 15; ++l)
+        {
+          for (int x = 0; x < l; ++x)
+            {
+              if (x != 0 && x % 4 == 0)
+                continue;
+              for (int y = 0; y < l; ++y)
+                {
+                  if (y != 0 && y % 4 == 0)
+                    continue;
+                  Vec2Int p = Vec2Int (x, y);
+                  if (is_empty_space_for_type (p, type))
+                    {
+                      pos = p;
+                      break;
+                    }
+                }
+              if (is_correct (pos))
+                break;
+            }
+          if (is_correct (pos))
+            break;
+          Vec2Int p = Vec2Int (l, l);
+          if (is_empty_space_for_type (p, type))
+            {
+              pos = p;
+              break;
+            }
+        }
+      return pos;
+    }
   return INCORRECT_VEC2INT;
 }
 
