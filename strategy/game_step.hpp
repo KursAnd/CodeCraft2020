@@ -22,6 +22,9 @@ private:
 
   const int MIN_BUILDER_UNITS = 15;
   const int MY_BASE_ZONE = 30;
+  const int MAX_LINES_OF_HOUSES = 10;
+  const int MAX_POSITION_OF_RANGED_BASE = 17;
+
   std::vector<int> enemy_near_base_ids;
 
   int m_id = 0;
@@ -34,7 +37,17 @@ private:
   Vec2Int m_res_pos;  // purpouse for BUILDERs who collect thr resources
   const Vec2Int INCORRECT_VEC2INT = Vec2Int(-1, -1);
 
-  std::unordered_map<int, Entity> m_entity_by_id;
+  struct find_id_t
+  {
+    bool is_enemy = false;
+    EntityType type;
+    int it = 0;
+    find_id_t () {}
+    find_id_t (bool is_enemy, EntityType type, int it)
+      : is_enemy (is_enemy), type (type), it (it)
+    {}
+  };
+  std::unordered_map<int, find_id_t> m_entity_by_id;
   std::unordered_map<EntityType, std::vector<Entity>> m_entity;
   std::unordered_set<int> ids_was;
   std::vector<std::vector<int>> map;
@@ -54,7 +67,10 @@ public:
   bool can_build (const EntityType type) const;
   int entity_price (const EntityType type, const int cnt = 1) const;
   void set_map_damage (const Entity &entity, bool add = true);
+  void recalculate_map_run ();
 
+  Entity &get_entity_by_id (const int id);
+  const Entity &get_entity_by_id (const int id) const;
   int get_count (const EntityType type) const;
   int get_army_count () const;
   int get_base_count () const;

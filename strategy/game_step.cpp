@@ -1,5 +1,13 @@
 #include "game_step.hpp"
 
+#include <iterator>
+#include <vector>
+#include <algorithm>
+#include <map>
+#include <set>
+#include <unordered_set>
+#include <unordered_map>
+
 std::unordered_set<int> game_step_t::destroyed_pos;
 std::unordered_map<int, Vec2Int> game_step_t::attack_move_tasks;
 
@@ -28,13 +36,12 @@ game_step_t::game_step_t (const PlayerView &_playerView, Action &_result)
 
   for (const Entity &entity : playerView->entities)
     {
-      m_entity_by_id[entity.id] = entity;
       if (entity.playerId != nullptr)
         {
           if (*entity.playerId == m_id)
             {
+              m_entity_by_id[entity.id] = find_id_t (false, entity.entityType, m_entity[entity.entityType].size ());
               m_entity[entity.entityType].push_back (entity);
-
               const EntityProperties &properties = playerView->entityProperties.at (entity.entityType);
               if (entity.active)
                 m_population_max += properties.populationProvide;
@@ -43,6 +50,7 @@ game_step_t::game_step_t (const PlayerView &_playerView, Action &_result)
             }
           else
             {
+              m_entity_by_id[entity.id] = find_id_t (true, entity.entityType, m_enemy[entity.entityType].size ());
               m_enemy[entity.entityType].push_back (entity);
               if (entity.position.x <= MY_BASE_ZONE && entity.position.y <= MY_BASE_ZONE)
                 enemy_near_base_ids.push_back (entity.id);
@@ -50,11 +58,13 @@ game_step_t::game_step_t (const PlayerView &_playerView, Action &_result)
         }
       else if (entity.entityType == RESOURCE)
         {
+          m_entity_by_id[entity.id] = find_id_t (false, entity.entityType, m_entity[entity.entityType].size ());
           m_entity[entity.entityType].push_back (entity);
           if (m_res_pos.x + m_res_pos.y > entity.position.x + entity.position.y)
             m_res_pos = entity.position;
         }
     }
+
   if (m_res_pos.x == _playerView.mapSize - 1 && m_res_pos.y == _playerView.mapSize - 1)
     m_res_pos = Vec2Int (0, 0);
   if (!enemy_near_base_ids.empty ())
@@ -62,14 +72,15 @@ game_step_t::game_step_t (const PlayerView &_playerView, Action &_result)
       std::vector<int> need_return;
       for (const std::pair<int, Vec2Int> &task : game_step_t::attack_move_tasks)
         {
-          if (!m_entity_by_id.count (task.first))
+          const int entity_id = task.first;
+          if (!m_entity_by_id.count (entity_id))
             {
-              need_return.push_back (task.first);
+              need_return.push_back (entity_id);
               continue;
             }
-          const Entity &entity = m_entity_by_id[task.first];
+          const Entity &entity = get_entity_by_id (entity_id);
           if (entity.position.x <= MY_BASE_ZONE + 5 && entity.position.y <= MY_BASE_ZONE + 5)
-            need_return.push_back (task.first);
+            need_return.push_back (entity_id);
         }
       for (const int id : need_return)
         game_step_t::attack_move_tasks.erase (id);
@@ -99,13 +110,11 @@ game_step_t::game_step_t (const PlayerView &_playerView, Action &_result)
   map = std::vector<std::vector<int>> (playerView->mapSize);
   map_id = std::vector<std::vector<int>> (playerView->mapSize);
   map_damage = std::vector<std::vector<int>> (playerView->mapSize);
-  map_run = std::vector<std::vector<int>> (playerView->mapSize);
   for (int i = 0; i < playerView->mapSize; ++i)
     {
       map[i] = std::vector<int> (playerView->mapSize, custom_value);
       map_id[i] = std::vector<int> (playerView->mapSize, -1);
       map_damage[i] = std::vector<int> (playerView->mapSize, 0);
-      map_run[i] = std::vector<int> (playerView->mapSize, 0);
     }
   if (playerView->fogOfWar)
     {
@@ -159,39 +168,7 @@ game_step_t::game_step_t (const PlayerView &_playerView, Action &_result)
       if (entity.active)
         set_map_damage (entity);
 
-  // attack zone
-  for (int x = 0; x < playerView->mapSize; ++x)
-    for (int y = 0; y < playerView->mapSize; ++y)
-      {
-        if (map_damage[x][y] > 0)
-          map_run[x][y] = 3;
-      }
-  // attack zone in 1 step
-  for (int x = 1; x < playerView->mapSize; ++x)
-    for (int y = 0; y < playerView->mapSize; ++y)
-      {
-        if (map_run[x][y] == 0 && map_run[x - 1][y] == 3)
-          map_run[x][y] = 2;
-        if (map_run[x - 1][y] == 0 && map_run[x][y] == 3)
-          map_run[x - 1][y] = 2;
-        if (map_run[y][x] == 0 && map_run[y][x - 1] == 3)
-          map_run[y][x] = 2;
-        if (map_run[y][x - 1] == 0 && map_run[y][x] == 3)
-          map_run[y][x - 1] = 2;
-      }
-  // attack zone in 2 step
-  for (int x = 1; x < playerView->mapSize; ++x)
-    for (int y = 0; y < playerView->mapSize; ++y)
-      {
-        if (map_run[x][y] == 0 && map_run[x - 1][y] == 2)
-          map_run[x][y] = 1;
-        if (map_run[x - 1][y] == 0 && map_run[x][y] == 2)
-          map_run[x - 1][y] = 1;
-        if (map_run[y][x] == 0 && map_run[y][x - 1] == 2)
-          map_run[y][x] = 1;
-        if (map_run[y][x - 1] == 0 && map_run[y][x] == 2)
-          map_run[y][x - 1] = 1;
-      }
+  recalculate_map_run ();
 }
 
 Vec2Int game_step_t::get_place_for (const EntityType type) const
@@ -199,7 +176,7 @@ Vec2Int game_step_t::get_place_for (const EntityType type) const
   if (type == HOUSE)
     {
       Vec2Int pos = INCORRECT_VEC2INT;
-      for (int l = 0; l < 10; ++l)
+      for (int l = 0; l < MAX_LINES_OF_HOUSES; ++l)
         {
           for (int i = 0; i < l; ++i)
             {
@@ -229,7 +206,7 @@ Vec2Int game_step_t::get_place_for (const EntityType type) const
   else if (type == RANGED_BASE)
     {
       Vec2Int pos = INCORRECT_VEC2INT;
-      for (int l = 0; l < 15; ++l)
+      for (int l = 0; l < MAX_POSITION_OF_RANGED_BASE; ++l)
         {
           for (int x = 0; x < l; ++x)
             {
@@ -452,6 +429,65 @@ int game_step_t::get_base_count () const
   return get_count (BUILDER_BASE) + get_count (RANGED_BASE) + get_count (MELEE_BASE);
 }
 
+Entity &game_step_t::get_entity_by_id (const int id)
+{
+  const find_id_t opt = m_entity_by_id.at (id);
+  if (opt.is_enemy)
+    return m_enemy[opt.type][opt.it];
+  else
+    return m_entity[opt.type][opt.it];
+}
+
+void game_step_t::recalculate_map_run ()
+{
+  map_run = std::vector<std::vector<int>> (playerView->mapSize);
+  for (int i = 0; i < playerView->mapSize; ++i)
+    map_run[i] = std::vector<int> (playerView->mapSize, 0);
+
+  // attack zone
+  for (int x = 0; x < playerView->mapSize; ++x)
+    for (int y = 0; y < playerView->mapSize; ++y)
+      {
+        if (map_damage[x][y] > 0)
+          map_run[x][y] = 3;
+      }
+  // attack zone in 1 step
+  for (int x = 1; x < playerView->mapSize; ++x)
+    for (int y = 0; y < playerView->mapSize; ++y)
+      {
+        if (map_run[x][y] == 0 && map_run[x - 1][y] == 3)
+          map_run[x][y] = 2;
+        if (map_run[x - 1][y] == 0 && map_run[x][y] == 3)
+          map_run[x - 1][y] = 2;
+        if (map_run[y][x] == 0 && map_run[y][x - 1] == 3)
+          map_run[y][x] = 2;
+        if (map_run[y][x - 1] == 0 && map_run[y][x] == 3)
+          map_run[y][x - 1] = 2;
+      }
+  // attack zone in 2 step
+  for (int x = 1; x < playerView->mapSize; ++x)
+    for (int y = 0; y < playerView->mapSize; ++y)
+      {
+        if (map_run[x][y] == 0 && map_run[x - 1][y] == 2)
+          map_run[x][y] = 1;
+        if (map_run[x - 1][y] == 0 && map_run[x][y] == 2)
+          map_run[x - 1][y] = 1;
+        if (map_run[y][x] == 0 && map_run[y][x - 1] == 2)
+          map_run[y][x] = 1;
+        if (map_run[y][x - 1] == 0 && map_run[y][x] == 2)
+          map_run[y][x - 1] = 1;
+      }
+}
+
+const Entity &game_step_t::get_entity_by_id (const int id) const
+{
+  const find_id_t opt = m_entity_by_id.at (id);
+  if (opt.is_enemy)
+    return m_enemy.at (opt.type).at (opt.it);
+  else
+    return m_entity.at (opt.type).at (opt.it);
+}
+
 bool game_step_t::is_busy (const int id) const
 {
   return ids_was.count (id);
@@ -512,7 +548,7 @@ int game_step_t::get_distance (const Vec2Int pos_a, const Vec2Int pos_b)
 // only TURRETS support optimized
 int game_step_t::get_build_distance (const int id /*build*/, const Vec2Int pos_b) const
 {
-  const Entity &build = m_entity_by_id.at (id);
+  const Entity &build = get_entity_by_id (id);
   const EntityProperties &properties = playerView->entityProperties.at (build.entityType);
   int dist = get_max_distance ();
   for (int x = build.position.x; x < build.position.x + properties.size; ++x)
@@ -570,7 +606,7 @@ bool game_step_t::is_correct_xy (const int x, const int y) const
 
 int game_step_t::get_distance_for_base (const int id_a, const Vec2Int &pos_b, const EntityType type_b, Vec2Int &best_pos) const
 {
-  const Vec2Int pos_a = m_entity_by_id.at (id_a).position;
+  const Vec2Int pos_a = get_entity_by_id (id_a).position;
   int res = get_max_distance ();
   for (const Vec2Int pos : get_nearest_free_places_for_me (id_a, pos_b, type_b))
     {
@@ -611,7 +647,7 @@ void game_step_t::get_nearest_worker_and_best_pos (const Vec2Int build_pos, cons
 
 std::vector<Vec2Int> game_step_t::get_nearest_free_places_for_me (const int id_a, const int id_b) const
 {
-  const Entity &entity = m_entity_by_id.at (id_b);
+  const Entity &entity = get_entity_by_id (id_b);
   return get_nearest_free_places_for_me (id_a, entity.position, entity.entityType);
 }
 
@@ -854,65 +890,78 @@ void game_step_t::attack_in_zone ()
         }
     }
 
-  // KILL EVERYONE WHOM CAN
-  for (auto it = enemy_to_us.begin (); it != enemy_to_us.end ();)
+  // 1 step: KILL EVERYONE WHOM CAN
+  // 2 step: HURT OTHERS
+  for (int step = 0; step < 2; ++step)
     {
-      const int enemy_id = it->first;
-      std::unordered_set<int> &our_ids = it->second;
-      Entity &enemy = m_entity_by_id[enemy_id];
-      if (enemy_hurt[enemy_id] < enemy.health)
+      std::vector<int> enemy_ids_sort;
+      enemy_ids_sort.reserve (enemy_to_us.size ());
+      std::transform (enemy_to_us.begin (), enemy_to_us.end (), std::back_inserter (enemy_ids_sort),
+                     [&enemy_ids_sort] (const std::pair<int, const std::unordered_set<int>> &a) { return a.first; });
+      std::sort (enemy_ids_sort.begin (), enemy_ids_sort.end (),
+                [&] (const int id_a, const int id_b)
+                  {
+                      const int min_life_stay_a = get_entity_by_id (id_a).health - enemy_hurt[id_a];
+                      const int min_life_stay_b = get_entity_by_id (id_b).health - enemy_hurt[id_b];
+                      return min_life_stay_a < min_life_stay_b;
+                  });
+      for (const int enemy_id : enemy_ids_sort)
         {
-          if (our_ids.empty ())
-            {
-              enemy_to_us.erase (it);
-              it = enemy_to_us.begin ();
-            }
-          else
-            ++it;
-          continue;
-        }
-      while (enemy.health > 0)
-        {
-          const int id = *our_ids.begin ();
-          const Entity &entity = m_entity_by_id.at (id);
-          const EntityProperties &prop = playerView->entityProperties.at (entity.entityType);
-          for (const int enemy_id_ : we_to_enemy[id])
-            {
-              enemy_to_us[enemy_id_].erase (id);
-              enemy_hurt[enemy_id_] -= prop.attack->damage;
-            }
-  
-          std::shared_ptr<AttackAction> atackAction  = std::shared_ptr<AttackAction> (new AttackAction (std::shared_ptr<int> (new int (enemy_id)), nullptr));
-          result->entityActions[id] = EntityAction (nullptr, nullptr, atackAction, nullptr);
-          make_busy (id);
-          enemy.health -= prop.attack->damage;
-        }
-      set_map_damage (enemy, false);
-      enemy_to_us.erase (it);
-      it = enemy_to_us.begin ();
-    }
-
-  // HURT OTHERS
-  for (const EntityType enemy_type : {RANGED_UNIT, MELEE_UNIT, TURRET})
-    {
-      for (auto it = enemy_to_us.begin (); it != enemy_to_us.end (); ++it)
-        {
-          const int enemy_id = it->first;
-          Entity &enemy = m_entity_by_id[enemy_id];
-          if (enemy.entityType != enemy_type)
+          std::unordered_set<int> &our_ids = enemy_to_us[enemy_id];
+          Entity &enemy = get_entity_by_id (enemy_id);
+          if (enemy.health <= 0)
+            continue; // smth wrong
+          if (step == 0 && enemy_hurt[enemy_id] < enemy.health)
             continue;
-          std::unordered_set<int> &our_ids = it->second;
-          for (const int id : our_ids)
+
+          std::vector<int> our_ids_sort;
+          our_ids_sort.reserve (our_ids.size ());
+          std::copy (our_ids.begin (), our_ids.end (), std::back_inserter (our_ids_sort));
+          std::sort (our_ids_sort.begin (), our_ids_sort.end (),
+                    [&] (const int id_a, const int id_b)
+                      {
+                         const int cnt_of_a_enemies = we_to_enemy[id_a].size ();
+                         const int cnt_of_b_enemies = we_to_enemy[id_b].size ();
+                         return cnt_of_a_enemies < cnt_of_b_enemies;
+                         // TO-DO: add order by other objects
+                      });
+
+          for (const int id : our_ids_sort)
             {
               if (is_busy (id))
-                continue;
+                continue; // smth wrong
+              const Entity &entity = get_entity_by_id (id);
+              const EntityProperties &prop = playerView->entityProperties.at (entity.entityType);
+              for (const int enemy_id_ : we_to_enemy[id])
+                {
+                  enemy_to_us[enemy_id_].erase (id);
+                  enemy_hurt[enemy_id_] -= prop.attack->damage;
+                }
+              we_to_enemy.erase (id);
+
               std::shared_ptr<AttackAction> atackAction  = std::shared_ptr<AttackAction> (new AttackAction (std::shared_ptr<int> (new int (enemy_id)), nullptr));
               result->entityActions[id] = EntityAction (nullptr, nullptr, atackAction, nullptr);
               make_busy (id);
-              enemy.health -= 5; //prop.attack->damage;
+              enemy.health -= prop.attack->damage;
+
+              if (enemy.health <= 0)
+                {
+                  set_map_damage (enemy, false);
+                  enemy_to_us.erase (enemy_id);
+                  break;
+                }
             }
         }
+      for (auto it = enemy_to_us.begin (); it != enemy_to_us.end ();)
+        {
+          if (it->second.empty ())
+            it = enemy_to_us.erase (it);
+          else
+            ++it;
+        }
     }
+
+  recalculate_map_run ();
 }
 
 void game_step_t::attack_step_back ()
@@ -974,7 +1023,8 @@ void game_step_t::attack_out_zone ()
       {
         const int enemy_id = it->first;
         auto &our_archs = it->second;
-        if (our_archs.size () < 4 && our_archs.size () * prop.attack->damage < m_entity_by_id[enemy_id].health / 2 && m_entity_by_id[enemy_id].active)
+        Entity &enemy = get_entity_by_id (enemy_id);
+        if (our_archs.size () < 4 && our_archs.size () * prop.attack->damage < enemy.health / 2 && enemy.active)
           {
             if (our_archs.empty ())
               {
@@ -985,21 +1035,21 @@ void game_step_t::attack_out_zone ()
               ++it;
             continue;
           }
-        while (!our_archs.empty () && m_entity_by_id[enemy_id].health > 0)
+        while (!our_archs.empty () && enemy.health > 0)
           {
             const int arch_id = *our_archs.begin ();
             for (const int enemy_id_ : turret_vict[arch_id])
               turret_aims[enemy_id_].erase (arch_id);
 
             std::shared_ptr<AttackAction> atackAction  = std::shared_ptr<AttackAction> (new AttackAction (std::shared_ptr<int> (new int (enemy_id)), nullptr));
-            std::shared_ptr<MoveAction>   moveAction   = std::shared_ptr<MoveAction> (new MoveAction (m_entity_by_id[enemy_id].position, true, false));
+            std::shared_ptr<MoveAction>   moveAction   = std::shared_ptr<MoveAction> (new MoveAction (enemy.position, true, false));
             result->entityActions[arch_id] = EntityAction (moveAction, nullptr, atackAction, nullptr);
             make_busy (arch_id);
-            m_entity_by_id[enemy_id].health -= prop.attack->damage;
+            enemy.health -= prop.attack->damage;
           }
-        if (m_entity_by_id[enemy_id].health)
+        if (enemy.health)
           {
-            set_map_damage (m_entity_by_id[enemy_id], false);
+            set_map_damage (enemy, false);
             turret_aims.erase (it);
             it = turret_aims.begin ();
           }
@@ -1059,10 +1109,11 @@ void game_step_t::move_army (const EntityType type)
           int dis = get_max_distance ();
           for (const int enemy_id : enemy_near_base_ids)
             {
-              int new_dis = get_distance (entity.position, m_entity_by_id[enemy_id].position);
+              Entity &enemy = get_entity_by_id (enemy_id);
+              int new_dis = get_distance (entity.position, enemy.position);
               if (dis > new_dis)
                 {
-                  pos = m_entity_by_id[enemy_id].position;
+                  pos = enemy.position;
                   dis = new_dis;
                 }
             }
@@ -1120,7 +1171,7 @@ void game_step_t::heal_nearest ()
           const int repair_id = map_id[repair_pos.x][repair_pos.y];
           if (repair_id < 0)
             continue;
-          const Entity &repair_entity = m_entity_by_id.at (repair_id);
+          const Entity &repair_entity = get_entity_by_id (repair_id);
           if (   (repair_entity.playerId == nullptr || *repair_entity.playerId != m_id)
               || (repair_entity.entityType != RANGED_UNIT && repair_entity.entityType != MELEE_UNIT && repair_entity.entityType != BUILDER_UNIT))
             continue;
@@ -1148,13 +1199,16 @@ void game_step_t::run_tasks ()
   for (auto &task : game_step_t::attack_move_tasks)
     {
       int id = task.first;
-      Vec2Int pos = task.second;
       if (!m_entity_by_id.count (id))
         {
           finished.insert (id);
           continue;
         }
-      const Entity &entity = m_entity_by_id[id];
+      if (is_busy (id))
+        continue;
+
+      const Entity &entity = get_entity_by_id (id);
+      Vec2Int pos = task.second;
 
       if (get_distance (entity.position, pos) <= 1)
         {
@@ -1171,34 +1225,25 @@ void game_step_t::run_tasks ()
               vec_new = attack_pos[new_dir];
             }
         }
-      if (is_busy (id))
-        continue;
 
-      const EntityProperties &properties = playerView->entityProperties.at (m_entity_by_id[id].entityType);
+      const EntityProperties &properties = playerView->entityProperties.at (get_entity_by_id (id).entityType);
       std::shared_ptr<MoveAction>   moveAction   = nullptr;
       std::shared_ptr<AttackAction> atackAction  = nullptr;
 
-      if (map_run[entity.position.x][entity.position.y] == 3)
-        {
-          int err = 3;
-          int er = 3;
-          //int e = 8 / (err - er);
-        }
       if (map_run[entity.position.x][entity.position.y] == 0)
         {
           moveAction = std::shared_ptr<MoveAction> (new MoveAction (pos, true, true));
+          // we must not (!) attack everybody after attack_in_zone, they can be already dead, we should make a step or attack others (not melee, arch, turret)
+          // TO-DO: make up how to do it (we can't just exclude them from list, we need to hunt them out of attack zone)
           atackAction = std::shared_ptr<AttackAction> (new AttackAction (nullptr, std::shared_ptr<AutoAttack> (new AutoAttack (properties.sightRange, {}))));
         }
       else
         {
-          Vec2Int safe_pos = get_step_back_for_entity (entity, map_run[entity.position.x][entity.position.y]);
-          if (is_correct (safe_pos))
-            {
-              map[safe_pos.x][safe_pos.y] = entity.entityType + 10; // hack
-              moveAction = std::shared_ptr<MoveAction> (new MoveAction (safe_pos, false, true));
-            }
-          else
-            atackAction = std::shared_ptr<AttackAction> (new AttackAction (nullptr, std::shared_ptr<AutoAttack> (new AutoAttack (properties.sightRange, {}))));
+          if (map_run[entity.position.x][entity.position.y] == 3) // map_run should be 1 or 2
+            pos = pos; // smth wrong
+
+          // SHOULD STAY ON PLACE
+          atackAction = std::shared_ptr<AttackAction> (new AttackAction (nullptr, std::shared_ptr<AutoAttack> (new AutoAttack (properties.attack->attackRange, {}))));
         }
 
       result->entityActions[entity.id] = EntityAction (moveAction, nullptr, atackAction, nullptr);
@@ -1255,7 +1300,7 @@ void game_step_t::redirect_all_atack_move_tasks (const Vec2Int old_pos, const Ve
       const Vec2Int pos = task.second;
       if (pos == old_pos)
         {
-          const EntityProperties &properties = playerView->entityProperties.at (m_entity_by_id[id].entityType);
+          const EntityProperties &properties = playerView->entityProperties.at (get_entity_by_id (id).entityType);
          
           std::shared_ptr<MoveAction>   moveAction   = std::shared_ptr<MoveAction> (new MoveAction (pos, true, true));
           std::shared_ptr<AttackAction> atackAction  = std::shared_ptr<AttackAction> (new AttackAction (nullptr, std::shared_ptr<AutoAttack> (new AutoAttack (properties.sightRange, {}))));
