@@ -1298,19 +1298,9 @@ void game_step_t::redirect_all_atack_move_tasks (const Vec2Int old_pos, const Ve
 {
   for (auto &task : game_step_t::attack_move_tasks)
     {
-      const int id = task.first;
       const Vec2Int pos = task.second;
       if (pos == old_pos)
-        {
-          const EntityProperties &properties = playerView->entityProperties.at (get_entity_by_id (id).entityType);
-         
-          std::shared_ptr<MoveAction>   moveAction   = std::shared_ptr<MoveAction> (new MoveAction (pos, true, true));
-          std::shared_ptr<AttackAction> atackAction  = std::shared_ptr<AttackAction> (new AttackAction (nullptr, std::shared_ptr<AutoAttack> (new AutoAttack (properties.sightRange, {}))));
-          
-          make_busy (id);
-          result->entityActions[id] = EntityAction (moveAction, nullptr, atackAction, nullptr);
-          task.second = new_pos;
-        }
+        task.second = new_pos;
     }
 }
 
