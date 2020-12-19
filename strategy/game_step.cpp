@@ -375,8 +375,7 @@ Vec2Int game_step_t::get_step_back_for_entity (const Entity &entity, const int l
   Vec2Int pos = entity.position;
   Vec2Int best_pos = INCORRECT_VEC2INT;
   std::vector<std::vector<Vec2Int>> best_poses = std::vector<std::vector<Vec2Int>> (level);
-  for (const Vec2Int p : {Vec2Int (pos.x    , pos.y - 1), Vec2Int (pos.x - 1, pos.y    ),
-                          Vec2Int (pos.x + 1, pos.y    ), Vec2Int (pos.x    , pos.y + 1)})
+  for (const Vec2Int p : get_poses_around (pos))
     {
       if (is_place_free (p) && map_run[p.x][p.y] < level)
         best_poses[map_run[p.x][p.y]].push_back (p);
@@ -785,6 +784,12 @@ void game_step_t::train_unit (const EntityType factoryType)
     }
 }
 
+std::vector<Vec2Int> game_step_t::get_poses_around (const Vec2Int pos) const
+{
+  return {Vec2Int (pos.x    , pos.y - 1), Vec2Int (pos.x - 1, pos.y    ),
+          Vec2Int (pos.x + 1, pos.y    ), Vec2Int (pos.x    , pos.y + 1)};
+}
+
 void game_step_t::check_repair (const EntityType repairType)
 {
   for (const Entity &repair_entity : get_vector (repairType))
@@ -1161,10 +1166,7 @@ void game_step_t::heal_nearest ()
       if (is_busy (healer))
         continue;
 
-      for (const Vec2Int repair_pos : {Vec2Int (healer.position.x + 1, healer.position.y    ),
-                                       Vec2Int (healer.position.x    , healer.position.y + 1),
-                                       Vec2Int (healer.position.x - 1, healer.position.y    ),
-                                       Vec2Int (healer.position.x    , healer.position.y - 1)})
+      for (const Vec2Int repair_pos : get_poses_around (healer.position))
         {
           if (!is_correct (repair_pos))
             continue;
