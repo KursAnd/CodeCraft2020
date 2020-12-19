@@ -24,6 +24,7 @@ private:
   const int MY_BASE_ZONE = 30;
   const int MAX_LINES_OF_HOUSES = 10;
   const int MAX_POSITION_OF_RANGED_BASE = 17;
+  const int MIN_POSITION_RANGED_DO_STEP_BACK = 20;
 
   std::vector<int> enemy_near_base_ids;
 
@@ -53,7 +54,9 @@ private:
   std::vector<std::vector<int>> map;
   std::vector<std::vector<int>> map_id;
   std::vector<std::vector<int>> map_damage;
+  std::vector<std::vector<int>> map_damage_melee; // TO-DO: think about all types
   std::vector<std::vector<int>> map_run;
+  std::vector<std::vector<int>> map_run_melee;
 
   std::unordered_map<EntityType, std::vector<Entity>> m_enemy;
 
@@ -89,6 +92,8 @@ public:
   bool is_place_free (const int x, const int y) const;
   bool is_place_contain (const int x, const int y, const EntityType type) const;
   bool is_place_contain_enemy (const int x, const int y, const EntityType type) const;
+  bool is_place_contain_us (const int x, const int y) const;
+  bool is_place_contain_enemy (const int x, const int y) const;
   bool is_correct (const Vec2Int pos) const;
   bool is_correct_xy (const int x, const int y) const;
 
@@ -115,8 +120,10 @@ public:
   void move_builders ();
   void attack_in_zone ();
   void attack_step_back ();
+  void attack_step_back_from_melee ();
   void attack_out_zone ();
   void attack_others ();
+  void builder_step_back ();
   void move_army (const EntityType type);
   void turn_on_turrets ();
   void heal_nearest ();

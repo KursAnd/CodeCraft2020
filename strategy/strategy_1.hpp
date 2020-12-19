@@ -12,11 +12,13 @@ void strategy_1 (const PlayerView& playerView, DebugInterface* debugInterface, A
 
   game_step_t gs (playerView, result);
   
+  gs.attack_step_back_from_melee ();
   gs.attack_in_zone ();
   gs.attack_step_back ();
-  gs.attack_out_zone ();
+  //gs.attack_out_zone ();
   gs.attack_others ();
 
+  gs.builder_step_back ();
   gs.heal_nearest ();
 
   gs.check_repair (BUILDER_BASE);

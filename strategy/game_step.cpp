@@ -110,11 +110,13 @@ game_step_t::game_step_t (const PlayerView &_playerView, Action &_result)
   map = std::vector<std::vector<int>> (playerView->mapSize);
   map_id = std::vector<std::vector<int>> (playerView->mapSize);
   map_damage = std::vector<std::vector<int>> (playerView->mapSize);
+  map_damage_melee = std::vector<std::vector<int>> (playerView->mapSize);
   for (int i = 0; i < playerView->mapSize; ++i)
     {
       map[i] = std::vector<int> (playerView->mapSize, custom_value);
       map_id[i] = std::vector<int> (playerView->mapSize, -1);
       map_damage[i] = std::vector<int> (playerView->mapSize, 0);
+      map_damage_melee[i] = std::vector<int> (playerView->mapSize, 0);
     }
   if (playerView->fogOfWar)
     {
@@ -320,29 +322,36 @@ void game_step_t::set_map_damage (const Entity &entity, bool add)
 {
   const EntityProperties &p = playerView->entityProperties.at (entity.entityType);
 
+  auto changing = [&] (const int x, const int y)
+    {
+      map_damage[x][y] += add ? p.attack->damage : -p.attack->damage;
+      if (entity.entityType == MELEE_UNIT)
+        map_damage_melee[x][y] += add ? p.attack->damage : -p.attack->damage;
+    };
+
   for (int x = std::max (0, entity.position.x - p.attack->attackRange); x < std::min (playerView->mapSize - 1, entity.position.x + p.size + p.attack->attackRange); ++x)
     for (int y = entity.position.y; y < entity.position.y + p.size; ++y)
-      map_damage[x][y] += add ? p.attack->damage : -p.attack->damage;
+      changing (x, y);
   for (int x = entity.position.x; x < entity.position.x + p.size; ++x)
     {
       for (int y = std::max (0, entity.position.y - p.attack->attackRange); y < entity.position.y; ++y)
-        map_damage[x][y] += add ? p.attack->damage : -p.attack->damage;
+        changing (x, y);
       for (int y = entity.position.y + p.size; y < std::min (playerView->mapSize - 1, entity.position.y + p.size + p.attack->attackRange); ++y)
-        map_damage[x][y] += add ? p.attack->damage : -p.attack->damage;
+        changing (x, y);
     }
   for (int k = 1, x = entity.position.x + p.size; x < std::min (playerView->mapSize - 1, entity.position.x + p.size + p.attack->attackRange - 1); ++x, ++k)
     {
       for (int y = entity.position.y - 1; y >= std::max (0, entity.position.y - p.attack->attackRange + k); --y)
-        map_damage[x][y] += add ? p.attack->damage : -p.attack->damage;
+        changing (x, y);
       for (int y = entity.position.y + p.size; y < std::min (playerView->mapSize - 1, entity.position.y + p.size + p.attack->attackRange - k); ++y)
-        map_damage[x][y] += add ? p.attack->damage : -p.attack->damage;
+        changing (x, y);
     }
   for (int k = 1, x = entity.position.x - 1; x >= std::max (0, entity.position.x - p.attack->attackRange + 1); --x, ++k)
     {
       for (int y = entity.position.y - 1; y >= std::max (0, entity.position.y - p.attack->attackRange + k); --y)
-        map_damage[x][y] += add ? p.attack->damage : -p.attack->damage;
+        changing (x, y);
       for (int y = entity.position.y + p.size; y < std::min (playerView->mapSize - 1, entity.position.y + p.size + p.attack->attackRange - k); ++y)
-        map_damage[x][y] += add ? p.attack->damage : -p.attack->damage;
+        changing (x, y);
     }
 }
 
@@ -440,8 +449,12 @@ Entity &game_step_t::get_entity_by_id (const int id)
 void game_step_t::recalculate_map_run ()
 {
   map_run = std::vector<std::vector<int>> (playerView->mapSize);
+  map_run_melee = std::vector<std::vector<int>> (playerView->mapSize);
   for (int i = 0; i < playerView->mapSize; ++i)
-    map_run[i] = std::vector<int> (playerView->mapSize, 0);
+    {
+      map_run[i] = std::vector<int> (playerView->mapSize, 0);
+      map_run_melee[i] = std::vector<int> (playerView->mapSize, 0);
+    }
 
   // attack zone
   for (int x = 0; x < playerView->mapSize; ++x)
@@ -449,32 +462,36 @@ void game_step_t::recalculate_map_run ()
       {
         if (map_damage[x][y] > 0)
           map_run[x][y] = 3;
+        if (map_damage_melee[x][y] > 0)
+          map_run_melee[x][y] = 3;
       }
+
+  // set map_<>[x1][y1] = lv1 if map_<>[x1][y1] == 0 && map_<>[x2][y2] == lv2
+  auto updater = [&] (const int x1, const int y1, const int lv1, const int x2, const int y2, const int lv2)
+    {
+      if (map_run[x1][y1] == 0 && map_run[x2][y2] == lv2)
+        map_run[x1][y1] = lv1;
+      if (map_run_melee[x1][y1] == 0 && map_run_melee[x2][y2] == lv2)
+        map_run_melee[x1][y1] = lv1;
+    };
+
   // attack zone in 1 step
   for (int x = 1; x < playerView->mapSize; ++x)
     for (int y = 0; y < playerView->mapSize; ++y)
       {
-        if (map_run[x][y] == 0 && map_run[x - 1][y] == 3)
-          map_run[x][y] = 2;
-        if (map_run[x - 1][y] == 0 && map_run[x][y] == 3)
-          map_run[x - 1][y] = 2;
-        if (map_run[y][x] == 0 && map_run[y][x - 1] == 3)
-          map_run[y][x] = 2;
-        if (map_run[y][x - 1] == 0 && map_run[y][x] == 3)
-          map_run[y][x - 1] = 2;
+        updater (x    , y    , 2, x - 1, y    , 3);
+        updater (x - 1, y    , 2, x    , y    , 3);
+        updater (y    , x    , 2, y    , x - 1, 3);
+        updater (y    , x - 1, 2, y    , x    , 3);
       }
   // attack zone in 2 step
   for (int x = 1; x < playerView->mapSize; ++x)
     for (int y = 0; y < playerView->mapSize; ++y)
       {
-        if (map_run[x][y] == 0 && map_run[x - 1][y] == 2)
-          map_run[x][y] = 1;
-        if (map_run[x - 1][y] == 0 && map_run[x][y] == 2)
-          map_run[x - 1][y] = 1;
-        if (map_run[y][x] == 0 && map_run[y][x - 1] == 2)
-          map_run[y][x] = 1;
-        if (map_run[y][x - 1] == 0 && map_run[y][x] == 2)
-          map_run[y][x - 1] = 1;
+        updater (x    , y    , 1, x - 1, y    , 2);
+        updater (x - 1, y    , 1, x    , y    , 2);
+        updater (y    , x    , 1, y    , x - 1, 2);
+        updater (y    , x - 1, 1, y    , x    , 2);
       }
 }
 
@@ -532,6 +549,16 @@ bool game_step_t::is_place_contain (const int x, const int y, const EntityType t
 bool game_step_t::is_place_contain_enemy (const int x, const int y, const EntityType type) const
 {
   return map.at (x).at (y) == -(type + 1); // 0 is empty
+}
+
+bool game_step_t::is_place_contain_us (const int x, const int y) const
+{
+  return map.at (x).at (y) > 0 && map.at (x).at (y) != RESOURCE;
+}
+
+bool game_step_t::is_place_contain_enemy (const int x, const int y) const
+{
+  return map.at (x).at (y) < 0 && map.at (x).at (y) != RESOURCE;;
 }
 
 int game_step_t::get_max_distance () const
@@ -971,28 +998,117 @@ void game_step_t::attack_in_zone ()
 
 void game_step_t::attack_step_back ()
 {
-  for (const EntityType type : {RANGED_UNIT/*, MELEE_UNIT*/, BUILDER_UNIT})
+  const EntityType type = RANGED_UNIT;
+  const EntityProperties &prop = playerView->entityProperties.at (type);
+  for (const Entity &entity : get_vector (type))
     {
-      const EntityProperties &prop = playerView->entityProperties.at (type);
-      for (const Entity &entity : get_vector (type))
-        {
-          if (is_busy (entity))
-            continue;
-          if (type == RANGED_UNIT && entity.position.x <= 20 && entity.position.y <= 20)
-            continue;
-          Vec2Int pos = entity.position;
+      Vec2Int pos = entity.position;
+      if (   is_busy (entity)
+          || map_run[pos.x][pos.y] == 0
+          || (entity.position.x <= MIN_POSITION_RANGED_DO_STEP_BACK && entity.position.y <= MIN_POSITION_RANGED_DO_STEP_BACK)) // TO-DO: exclude it
+        continue;
 
-          if (map_run[pos.x][pos.y] == 2 || (map_run[pos.x][pos.y] == 3 && type == BUILDER_UNIT))
+      std::shared_ptr<MoveAction>   moveAction   = nullptr;
+      std::shared_ptr<AttackAction> atackAction  = nullptr;
+      if (map_run[pos.x][pos.y] == 3)
+        pos = pos; // smth wrong
+      if (map_run[pos.x][pos.y] == 2)
+        {
+          Vec2Int best_pos = get_step_back_for_entity (entity, map_run[pos.x][pos.y]);
+          if (is_correct (best_pos))
             {
-              Vec2Int best_pos = get_step_back_for_entity (entity, map_run[pos.x][pos.y]);
-              if (is_correct (best_pos))
+              moveAction   = std::shared_ptr<MoveAction> (new MoveAction (best_pos, false, true));
+              map[best_pos.x][best_pos.y] = entity.entityType + 10;
+            }
+        }
+
+      result->entityActions[entity.id] = EntityAction (moveAction, nullptr, atackAction, nullptr);
+      make_busy (entity.id);
+    }
+}
+
+void game_step_t::attack_step_back_from_melee ()
+{
+  const EntityType type = RANGED_UNIT;
+  const EntityProperties &prop = playerView->entityProperties.at (type);
+  for (const Entity &entity : get_vector (type))
+    {
+      Vec2Int pos = entity.position;
+      if (   is_busy (entity)
+          || map_run_melee[pos.x][pos.y] < 2
+          || (entity.position.x <= MIN_POSITION_RANGED_DO_STEP_BACK && entity.position.y <= MIN_POSITION_RANGED_DO_STEP_BACK)) // TO-DO: exclude it
+        continue;
+
+      std::shared_ptr<MoveAction>   moveAction   = nullptr;
+      std::shared_ptr<AttackAction> atackAction  = nullptr;
+      if (map_run_melee[pos.x][pos.y] == 2)
+        {
+          Vec2Int best_pos = get_step_back_for_entity (entity, map_run_melee[pos.x][pos.y]); // use the same func as map_run
+          if (is_correct (best_pos))
+            {
+              moveAction   = std::shared_ptr<MoveAction> (new MoveAction (best_pos, false, true));
+              map[best_pos.x][best_pos.y] = entity.entityType + 10;
+            }
+        }
+
+      result->entityActions[entity.id] = EntityAction (moveAction, nullptr, atackAction, nullptr);
+      make_busy (entity.id);
+    }
+}
+
+void game_step_t::builder_step_back ()
+{
+  const EntityType type = BUILDER_UNIT;
+  const EntityProperties &prop = playerView->entityProperties.at (type);
+  for (const Entity &entity : get_vector (type))
+    {
+      Vec2Int pos = entity.position;
+      const int danger_lv = map_run[pos.x][pos.y];
+      if (is_busy (entity) || danger_lv == 0)
+        continue;
+
+      Vec2Int best_pos = get_step_back_for_entity (entity, danger_lv);
+      if (is_correct (best_pos))
+        {
+          std::shared_ptr<MoveAction>   moveAction   = std::shared_ptr<MoveAction> (new MoveAction (best_pos, false, true));
+          result->entityActions[entity.id] = EntityAction (moveAction, nullptr, nullptr, nullptr);
+          make_busy (entity.id);
+          map[best_pos.x][best_pos.y] = entity.entityType + 10;
+        }
+      else
+        {
+          // try to do anything
+          std::shared_ptr<AttackAction> atackAction  = nullptr;
+          std::shared_ptr<RepairAction> repairAction = nullptr;
+          for (const Vec2Int p : get_poses_around (pos))
+            {
+              if (!is_correct (p))
+                continue;
+              const int p_id = map_id[p.x][p.y];
+              if (p_id == -1)
+                continue;
+              Entity &entity = get_entity_by_id (p_id);
+              if (   is_place_contain (p.x, p.y, RESOURCE)
+                  || (is_place_contain_enemy (p.x, p.y) && entity.health > 0))
                 {
-                  std::shared_ptr<MoveAction>   moveAction   = std::shared_ptr<MoveAction> (new MoveAction (best_pos, false, true));
-                  result->entityActions[entity.id] = EntityAction (moveAction, nullptr, nullptr, nullptr);
-                  make_busy (entity.id);
-                  map[best_pos.x][best_pos.y] = entity.entityType + 10;
+                  atackAction = std::shared_ptr<AttackAction> (new AttackAction (std::shared_ptr<int> (new int (p_id)), nullptr));
+                  break;
+                }
+              if (is_place_contain_us (p.x, p.y))
+                {
+                  const EntityProperties &p_prop = playerView->entityProperties.at (type);
+                  if (entity.health < p_prop.maxHealth)
+                    {
+                      repairAction = std::shared_ptr<RepairAction> (new RepairAction (p_id));
+                      break;
+                    }
                 }
             }
+          if (!atackAction && !repairAction)
+            atackAction = std::shared_ptr<AttackAction> (new AttackAction (nullptr, std::shared_ptr<AutoAttack> (new AutoAttack (prop.sightRange, {}))));
+
+          result->entityActions[entity.id] = EntityAction (nullptr, nullptr, atackAction, nullptr);
+          make_busy (entity.id);
         }
     }
 }
@@ -1228,26 +1344,14 @@ void game_step_t::run_tasks ()
             }
         }
 
+      if (map_run[entity.position.x][entity.position.y] != 0)
+        pos = pos; // smth wrong
+
       const EntityProperties &properties = playerView->entityProperties.at (get_entity_by_id (id).entityType);
-      std::shared_ptr<MoveAction>   moveAction   = nullptr;
-      std::shared_ptr<AttackAction> atackAction  = nullptr;
-
-      if (map_run[entity.position.x][entity.position.y] == 0)
-        {
-          moveAction = std::shared_ptr<MoveAction> (new MoveAction (pos, true, true));
-          // we must not (!) attack everybody after attack_in_zone, they can be already dead, we should make a step or attack others (not melee, arch, turret)
-          // TO-DO: make up how to do it (we can't just exclude them from list, we need to hunt them out of attack zone)
-          atackAction = std::shared_ptr<AttackAction> (new AttackAction (nullptr, std::shared_ptr<AutoAttack> (new AutoAttack (properties.sightRange, {}))));
-        }
-      else
-        {
-          if (map_run[entity.position.x][entity.position.y] == 3) // map_run should be 1 or 2
-            pos = pos; // smth wrong
-
-          // SHOULD STAY ON PLACE
-          atackAction = std::shared_ptr<AttackAction> (new AttackAction (nullptr, std::shared_ptr<AutoAttack> (new AutoAttack (properties.attack->attackRange, {}))));
-        }
-
+      std::shared_ptr<MoveAction>   moveAction   = std::shared_ptr<MoveAction> (new MoveAction (pos, true, true));
+      // we must not (!) attack everybody after attack_in_zone, they can be already dead, we should make a step or attack others (not melee, arch, turret)
+      // TO-DO: make up how to do it (we can't just exclude them from list, we need to hunt them out of attack zone)
+      std::shared_ptr<AttackAction>  atackAction = std::shared_ptr<AttackAction> (new AttackAction (nullptr, std::shared_ptr<AutoAttack> (new AutoAttack (properties.sightRange, {}))));
       result->entityActions[entity.id] = EntityAction (moveAction, nullptr, atackAction, nullptr);
       make_busy (id);
     }
