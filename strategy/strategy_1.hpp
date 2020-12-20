@@ -14,6 +14,7 @@ void strategy_1 (const PlayerView& playerView, DebugInterface* debugInterface, A
   
   gs.attack_step_back_from_melee ();
   gs.attack_in_zone ();
+  gs.attack_out_zone ();
   gs.attack_step_back ();
   //gs.attack_out_zone ();
   gs.attack_others ();

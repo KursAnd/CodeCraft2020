@@ -58,6 +58,9 @@ private:
   std::vector<std::vector<int>> map_run;
   std::vector<std::vector<int>> map_run_melee;
 
+  std::vector<std::vector<std::unordered_set<int>>> map_damage_who;
+  std::vector<std::vector<std::unordered_set<int>>> map_damage_who_run;
+
   std::unordered_map<EntityType, std::vector<Entity>> m_enemy;
 
 
