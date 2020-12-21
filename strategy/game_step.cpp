@@ -53,8 +53,6 @@ game_step_t::game_step_t (const PlayerView &_playerView, Action &_result)
             {
               m_entity_by_id[entity.id] = find_id_t (true, entity.entityType, m_enemy[entity.entityType].size ());
               m_enemy[entity.entityType].push_back (entity);
-              if (entity.position.x <= MY_BASE_ZONE && entity.position.y <= MY_BASE_ZONE)
-                enemy_near_base_ids.push_back (entity.id);
             }
         }
       else if (entity.entityType == RESOURCE)
@@ -68,24 +66,8 @@ game_step_t::game_step_t (const PlayerView &_playerView, Action &_result)
 
   if (m_res_pos.x == _playerView.mapSize - 1 && m_res_pos.y == _playerView.mapSize - 1)
     m_res_pos = Vec2Int (0, 0);
-  if (!enemy_near_base_ids.empty ())
-    {
-      std::vector<int> need_return;
-      for (const std::pair<int, Vec2Int> &task : game_step_t::attack_move_tasks)
-        {
-          const int entity_id = task.first;
-          if (!m_entity_by_id.count (entity_id))
-            {
-              need_return.push_back (entity_id);
-              continue;
-            }
-          const Entity &entity = get_entity_by_id (entity_id);
-          if (entity.position.x <= MY_BASE_ZONE + 5 && entity.position.y <= MY_BASE_ZONE + 5)
-            need_return.push_back (entity_id);
-        }
-      for (const int id : need_return)
-        game_step_t::attack_move_tasks.erase (id);
-    }
+
+  calculate_enemies_near_base ();
 
   if (m_entity[RESOURCE].empty () && playerView->currentTick > 30)
     {
@@ -487,6 +469,49 @@ void game_step_t::recalculate_map_run ()
         updater (y    , x    , 1, y    , x - 1, 2);
         updater (y    , x - 1, 1, y    , x    , 2);
       }
+}
+
+void game_step_t::calculate_enemies_near_base ()
+{
+  int base_zone_x = 0, base_zone_y = 0;
+  for (const EntityType type : {BUILDER_BASE, RANGED_BASE, MELEE_BASE, HOUSE, WALL, TURRET}) // TO-DO: think about TURRET
+    {
+      const EntityProperties &p = playerView->entityProperties.at (type);
+      for (const Entity &entity : get_vector (type))
+        {
+          for (const EntityType enemy_type : {MELEE_UNIT, RANGED_UNIT})
+            {
+              const EntityProperties &p_enemy = playerView->entityProperties.at (enemy_type);
+              for (const Entity &enemy : get_enemy_vector (enemy_type))
+                {
+                  if (get_distance (entity, enemy) <= p_enemy.sightRange)
+                    enemy_near_base_ids.push_back (entity.id);
+                }
+            }
+          base_zone_x = std::max (base_zone_x, entity.position.x + p.size);
+          base_zone_y = std::max (base_zone_y, entity.position.y + p.size);
+        }
+    }
+
+  // return attack group
+  if (!enemy_near_base_ids.empty ())
+    {
+      std::vector<int> need_return;
+      for (const std::pair<int, Vec2Int> &task : game_step_t::attack_move_tasks)
+        {
+          const int entity_id = task.first;
+          if (!m_entity_by_id.count (entity_id))
+            {
+              need_return.push_back (entity_id);
+              continue;
+            }
+          const Entity &entity = get_entity_by_id (entity_id);
+          if (entity.position.x <= base_zone_x + 5 && entity.position.y <= base_zone_y + 5)
+            need_return.push_back (entity_id);
+        }
+      for (const int id : need_return)
+        game_step_t::attack_move_tasks.erase (id);
+    }
 }
 
 const Entity &game_step_t::get_entity_by_id (const int id) const

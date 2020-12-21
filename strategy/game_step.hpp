@@ -21,7 +21,6 @@ private:
   bool builders_is_attakers = false;
 
   const int MIN_BUILDER_UNITS = 15;
-  const int MY_BASE_ZONE = 30;
   const int MAX_LINES_OF_HOUSES = 10;
   const int MAX_POSITION_OF_RANGED_BASE = 17;
   const int MIN_POSITION_RANGED_DO_STEP_BACK = 20;
@@ -64,6 +63,9 @@ private:
   std::unordered_map<EntityType, std::vector<Entity>> m_enemy;
 
 
+  void calculate_enemies_near_base ();
+  void recalculate_map_run ();
+
 public:
   game_step_t (const PlayerView &_playerView, Action &_result);
 
@@ -73,7 +75,6 @@ public:
   bool can_build (const EntityType type) const;
   int entity_price (const EntityType type, const int cnt = 1) const;
   void set_map_damage (const Entity &entity, bool add = true);
-  void recalculate_map_run ();
 
   Entity &get_entity_by_id (const int id);
   const Entity &get_entity_by_id (const int id) const;
