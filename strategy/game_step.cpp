@@ -32,6 +32,7 @@ game_step_t::game_step_t (const PlayerView &_playerView, Action &_result)
     if (player.id == m_id)
       {
         m_resource = player.resource;
+        break;
       }
 
   for (const Entity &entity : playerView->entities)
@@ -325,43 +326,18 @@ void game_step_t::set_map_damage (const Entity &entity, bool add)
 {
   const EntityProperties &p = playerView->entityProperties.at (entity.entityType);
 
-  auto changing = [&] (const int x, const int y)
+  for (const Vec2Int pos : get_all_poses_in_area_of_entity (entity, p.attack->attackRange))
     {
-      map_damage[x][y] += add ? p.attack->damage : -p.attack->damage;
+      map_damage[pos.x][pos.y] += add ? p.attack->damage : -p.attack->damage;
       if (entity.entityType == MELEE_UNIT)
-        map_damage_melee[x][y] += add ? p.attack->damage : -p.attack->damage;
+        map_damage_melee[pos.x][pos.y] += add ? p.attack->damage : -p.attack->damage;
       else
         {
           if (add)
-            map_damage_who[x][y].insert (entity.id);
+            map_damage_who[pos.x][pos.y].insert (entity.id);
           else
-            map_damage_who[x][y].erase (entity.id);
+            map_damage_who[pos.x][pos.y].erase (entity.id);
         }
-    };
-
-  for (int x = std::max (0, entity.position.x - p.attack->attackRange); x < std::min (playerView->mapSize - 1, entity.position.x + p.size + p.attack->attackRange); ++x)
-    for (int y = entity.position.y; y < entity.position.y + p.size; ++y)
-      changing (x, y);
-  for (int x = entity.position.x; x < entity.position.x + p.size; ++x)
-    {
-      for (int y = std::max (0, entity.position.y - p.attack->attackRange); y < entity.position.y; ++y)
-        changing (x, y);
-      for (int y = entity.position.y + p.size; y < std::min (playerView->mapSize - 1, entity.position.y + p.size + p.attack->attackRange); ++y)
-        changing (x, y);
-    }
-  for (int k = 1, x = entity.position.x + p.size; x < std::min (playerView->mapSize - 1, entity.position.x + p.size + p.attack->attackRange - 1); ++x, ++k)
-    {
-      for (int y = entity.position.y - 1; y >= std::max (0, entity.position.y - p.attack->attackRange + k); --y)
-        changing (x, y);
-      for (int y = entity.position.y + p.size; y < std::min (playerView->mapSize - 1, entity.position.y + p.size + p.attack->attackRange - k); ++y)
-        changing (x, y);
-    }
-  for (int k = 1, x = entity.position.x - 1; x >= std::max (0, entity.position.x - p.attack->attackRange + 1); --x, ++k)
-    {
-      for (int y = entity.position.y - 1; y >= std::max (0, entity.position.y - p.attack->attackRange + k); --y)
-        changing (x, y);
-      for (int y = entity.position.y + p.size; y < std::min (playerView->mapSize - 1, entity.position.y + p.size + p.attack->attackRange - k); ++y)
-        changing (x, y);
     }
 }
 
@@ -1453,6 +1429,41 @@ void game_step_t::run_tasks ()
     game_step_t::attack_move_tasks.erase (id);
   if (need_redirect)
     redirect_all_atack_move_tasks (vec_old, vec_new);
+}
+
+std::vector<Vec2Int> game_step_t::get_all_poses_in_area_of_entity (const Entity &entity, const int zone_size) const
+{
+  std::vector<Vec2Int> res;
+
+  const EntityProperties &p = playerView->entityProperties.at (entity.entityType);
+  res.reserve (static_cast <size_t> (p.size) * p.size + static_cast <size_t> (1 + zone_size) * zone_size / 2);
+
+  for (int x = std::max (0, entity.position.x - zone_size); x < std::min (playerView->mapSize - 1, entity.position.x + p.size + zone_size); ++x)
+    for (int y = entity.position.y; y < entity.position.y + p.size; ++y)
+      res.push_back (Vec2Int (x, y));
+  for (int x = entity.position.x; x < entity.position.x + p.size; ++x)
+    {
+      for (int y = std::max (0, entity.position.y - zone_size); y < entity.position.y; ++y)
+        res.push_back (Vec2Int (x, y));
+      for (int y = entity.position.y + p.size; y < std::min (playerView->mapSize - 1, entity.position.y + p.size + zone_size); ++y)
+        res.push_back (Vec2Int (x, y));
+    }
+  for (int k = 1, x = entity.position.x + p.size; x < std::min (playerView->mapSize - 1, entity.position.x + p.size + zone_size - 1); ++x, ++k)
+    {
+      for (int y = entity.position.y - 1; y >= std::max (0, entity.position.y - zone_size + k); --y)
+        res.push_back (Vec2Int (x, y));
+      for (int y = entity.position.y + p.size; y < std::min (playerView->mapSize - 1, entity.position.y + p.size + zone_size - k); ++y)
+        res.push_back (Vec2Int (x, y));
+    }
+  for (int k = 1, x = entity.position.x - 1; x >= std::max (0, entity.position.x - zone_size + 1); --x, ++k)
+    {
+      for (int y = entity.position.y - 1; y >= std::max (0, entity.position.y - zone_size + k); --y)
+        res.push_back (Vec2Int (x, y));
+      for (int y = entity.position.y + p.size; y < std::min (playerView->mapSize - 1, entity.position.y + p.size + zone_size - k); ++y)
+        res.push_back (Vec2Int (x, y));
+    }
+
+  return res;
 }
 
 void game_step_t::make_atack_groups ()

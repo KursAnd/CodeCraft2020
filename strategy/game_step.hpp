@@ -110,6 +110,7 @@ public:
   int get_distance_for_base (const int id_a, const Vec2Int &pos_b, const EntityType type_b, Vec2Int &best_pos) const;
   std::vector<Vec2Int> get_nearest_free_places_for_me (const int id_a, const int id_b) const;
   std::vector<Vec2Int> get_nearest_free_places_for_me (const int id_a, const Vec2Int pos, const EntityType type) const;
+  std::vector<Vec2Int> get_all_poses_in_area_of_entity (const Entity &entity, const int zone_size) const;
 
   int count_workers_to_repair (const EntityType type) const;
   
