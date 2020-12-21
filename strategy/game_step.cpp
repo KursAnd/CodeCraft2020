@@ -487,7 +487,7 @@ void game_step_t::calculate_enemies_near_base ()
               for (const Entity &enemy : get_enemy_vector (enemy_type))
                 {
                   if (get_distance (entity, enemy) <= p_enemy.sightRange)
-                    enemy_near_base_ids.push_back (entity.id);
+                    enemy_near_base_ids.push_back (enemy.id);
                 }
             }
           base_zone_x = std::max (base_zone_x, entity.position.x + p.size);
