@@ -234,16 +234,18 @@ bool game_step_t::need_build (const EntityType type) const
   switch (type)
     {
       case BUILDER_UNIT: return (   get_count (BUILDER_UNIT) < std::max (MIN_BUILDER_UNITS, m_population_max * 4 / 10)
-                                 || (get_count (BUILDER_UNIT) < MIN_BUILDER_UNITS * 2 && !can_build (RANGED_UNIT))
-                                 || (get_count (BUILDER_UNIT) < MIN_BUILDER_UNITS * 2 && get_count (RANGED_UNIT) > MIN_BUILDER_UNITS && get_count (RESOURCE) > MIN_BUILDER_UNITS))
+                                 || get_count (RANGED_UNIT) == 0)
+                             && get_count (RESOURCE) > get_count (BUILDER_UNIT)
                              && !builders_is_attakers;
-      case RANGED_UNIT : return get_count (BUILDER_UNIT) >= MIN_BUILDER_UNITS || !game_step_t::enemy_near_base_ids.empty ();
-      case MELEE_UNIT  : return !can_build (RANGED_UNIT) && !game_step_t::enemy_near_base_ids.empty ();
+      case RANGED_UNIT : return get_count (BUILDER_UNIT) >= MIN_BUILDER_UNITS
+                             || !game_step_t::enemy_near_base_ids.empty ();
+      case MELEE_UNIT  : return !can_build (RANGED_UNIT)
+                             && !game_step_t::enemy_near_base_ids.empty ();
 
       case HOUSE       :
         return m_population_use + 10 > m_population_max_future
-            && (get_count (RANGED_BASE) > 0 || get_count (BUILDER_UNIT) < MIN_BUILDER_UNITS * 2)
-            && (get_count (RANGED_BASE) > 0 || get_count (HOUSE) < 4)
+            && (get_count (RANGED_BASE) > 0 || get_count (BUILDER_UNIT) < MIN_BUILDER_UNITS)
+            && (get_count (RANGED_BASE) > 0 || get_count (HOUSE) < 5)
             && game_step_t::enemy_near_base_ids.empty ();
       case TURRET      :
         return get_count (BUILDER_UNIT) >= MIN_BUILDER_UNITS
@@ -251,7 +253,6 @@ bool game_step_t::need_build (const EntityType type) const
             && 1.0 * m_population_use / m_population_max > 0.65
             && get_count (BUILDER_BASE) > 0
             && get_count (RANGED_BASE) > 0
-            && get_count (TURRET) < 6
             && game_step_t::enemy_near_base_ids.empty ();
       case WALL        :
         return get_count (BUILDER_UNIT) >= MIN_BUILDER_UNITS
@@ -265,7 +266,7 @@ bool game_step_t::need_build (const EntityType type) const
       case RANGED_BASE :
       case MELEE_BASE  :
         return get_count (type) == 0
-            && game_step_t::enemy_near_base_ids.empty ();
+            && (game_step_t::enemy_near_base_ids.empty () || playerView->currentTick < 100);
       default: break;
     }
   return false;
