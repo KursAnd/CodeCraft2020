@@ -15,6 +15,7 @@ private:
   
   static std::unordered_set<int> destroyed_pos;
   static std::unordered_map<int, Vec2Int> attack_move_tasks;
+  static std::unordered_set<int> protect_task;
   std::vector<Vec2Int> attack_pos;
 
 
@@ -115,6 +116,7 @@ public:
   std::vector<Vec2Int> get_all_poses_in_area_of_entity (const Entity &entity, const int zone_size) const;
 
   int count_workers_to_repair (const EntityType type) const;
+  int count_of_protectors () const;
   
 
   bool buy_entity (const EntityType type, const int cnt = 1);
@@ -133,6 +135,7 @@ public:
   void move_army (const EntityType type);
   void turn_on_turrets ();
   void heal_nearest ();
+  void protect_base ();
 
 
   void run_tasks ();

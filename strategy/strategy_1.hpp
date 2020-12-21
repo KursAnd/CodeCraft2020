@@ -16,7 +16,6 @@ void strategy_1 (const PlayerView& playerView, DebugInterface* debugInterface, A
   gs.attack_in_zone ();
   gs.attack_out_zone ();
   gs.attack_step_back ();
-  //gs.attack_out_zone ();
   gs.attack_others ();
 
   gs.builder_step_back ();
@@ -43,6 +42,7 @@ void strategy_1 (const PlayerView& playerView, DebugInterface* debugInterface, A
 
   gs.move_builders ();
   gs.run_tasks ();
+  //gs.protect_base ();
   gs.make_atack_groups ();
   gs.move_army (RANGED_UNIT);
   gs.move_army (MELEE_UNIT);

@@ -10,6 +10,7 @@
 
 std::unordered_set<int> game_step_t::destroyed_pos;
 std::unordered_map<int, Vec2Int> game_step_t::attack_move_tasks;
+std::unordered_set<int> game_step_t::protect_task;
 
 
 game_step_t::game_step_t (const PlayerView &_playerView, Action &_result)
@@ -1070,6 +1071,28 @@ void game_step_t::attack_step_back ()
     }
 }
 
+void game_step_t::protect_base ()
+{
+  for (auto it = game_step_t::protect_task.begin (); it != game_step_t::protect_task.end ();)
+    {
+      if (m_entity_by_id.count (*it))
+        ++it;
+      else
+        it = game_step_t::protect_task.erase (it);
+    }
+  if (game_step_t::protect_task.size () < count_of_protectors ())
+    {
+      for (const Entity &entity : get_vector (RANGED_UNIT))
+        {
+          if (is_busy (entity))
+            continue;
+          game_step_t::protect_task.insert (entity.id);
+          if (game_step_t::protect_task.size () >= count_of_protectors ())
+            break;
+        }
+    }
+}
+
 void game_step_t::attack_step_back_from_melee ()
 {
   const EntityType type = RANGED_UNIT;
@@ -1154,6 +1177,11 @@ void game_step_t::builder_step_back ()
           make_busy (entity.id);
         }
     }
+}
+
+int game_step_t::count_of_protectors () const
+{
+  return 5; // TO-DO: think about it
 }
 
 void game_step_t::attack_out_zone ()
