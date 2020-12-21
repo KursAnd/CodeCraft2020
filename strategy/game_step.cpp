@@ -620,19 +620,18 @@ int game_step_t::get_build_to_build_distance (const Entity &a, const Entity &b) 
   return dist;
 }
 
-// only TURRETS support
 int game_step_t::get_distance (const Entity &a, const Entity &b) const
 {
-  if (a.entityType == TURRET)
+  if (is_building (a.entityType))
     {
-      if (b.entityType == TURRET)
+      if (is_building (b.entityType))
         return get_build_to_build_distance (a, b);
       else
         return get_build_distance (a.id, b.position);
     }
   else
     {
-      if (b.entityType == TURRET)
+      if (is_building (b.entityType))
         return get_build_distance (b.id, a.position);
       else
         return get_distance (a.position, b.position);
@@ -828,6 +827,27 @@ void game_step_t::train_unit (const EntityType factoryType)
 
       result->entityActions[entity.id] = EntityAction (moveAction, buildAction, atackAction, repairAction);
     }
+}
+
+bool game_step_t::is_building (const EntityType type) const
+{
+  switch (type)
+    {
+      case TURRET:
+      case WALL:
+      case HOUSE:
+      case BUILDER_BASE:
+      case MELEE_BASE:
+      case RANGED_BASE:
+        return true;
+      case BUILDER_UNIT:
+      case MELEE_UNIT:
+      case RANGED_UNIT:
+      case RESOURCE:
+        return false;
+      default: break;
+    }
+  return false;
 }
 
 std::vector<Vec2Int> game_step_t::get_poses_around (const Vec2Int pos) const
