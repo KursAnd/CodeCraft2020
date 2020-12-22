@@ -19,8 +19,16 @@ void strategy_1 (const PlayerView& playerView, DebugInterface* debugInterface, A
   gs.attack_others_in_zone ();
   gs.attack_others_out_zone ();
 
+
   gs.builder_step_back ();
   gs.heal_nearest ();
+  gs.attack_try_heal ();
+  gs.run_tasks ();
+  //gs.protect_base ();
+  gs.make_atack_groups ();
+  gs.move_army (RANGED_UNIT);
+  gs.move_army (MELEE_UNIT);
+
 
   gs.check_repair (BUILDER_BASE);
   gs.check_repair (RANGED_BASE);
@@ -42,11 +50,6 @@ void strategy_1 (const PlayerView& playerView, DebugInterface* debugInterface, A
 
 
   gs.move_builders ();
-  gs.run_tasks ();
-  //gs.protect_base ();
-  gs.make_atack_groups ();
-  gs.move_army (RANGED_UNIT);
-  gs.move_army (MELEE_UNIT);
 
   gs.turn_on_turrets ();
 }

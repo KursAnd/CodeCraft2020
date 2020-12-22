@@ -1480,6 +1480,120 @@ void game_step_t::heal_nearest ()
     }
 }
 
+void game_step_t::attack_try_heal ()
+{
+  const EntityType healer_type = BUILDER_UNIT;
+  for (const EntityType type : {RANGED_UNIT, BUILDER_UNIT})
+    {
+      const EntityProperties &p = playerView->entityProperties.at (type);
+
+      for (const Entity &entity : get_vector (type))
+        {
+          if (is_busy (entity) || entity.health > p.maxHealth - 5)
+            continue;
+          Entity *healer = nullptr;
+          int dis = 3;
+          for (Entity &healer_ : get_vector (healer_type))
+            {
+              if (entity.id == healer_.id)
+                continue;
+              if (is_busy (healer_))
+                {
+                  if (result->entityActions[healer_.id].repairAction && result->entityActions[healer_.id].repairAction->target == entity.id)
+                    {
+                      if (entity.health < p.maxHealth - 5)
+                        {
+                          dis = 0;
+                          healer = &healer_;
+                        }
+                      else
+                        healer = nullptr;
+                      break;
+                    }
+                }
+              int new_dis = get_distance (entity.position, healer_.position) - 1;
+              if (new_dis >= dis)
+                continue;
+
+              dis = new_dis;
+              healer = &healer_;
+              if (dis == 0)
+                break;
+            }
+          if (!healer)
+            continue;
+
+          std::shared_ptr<AttackAction> atackAction_1  = nullptr;
+          std::shared_ptr<RepairAction> repairAction_1 = nullptr;
+          std::shared_ptr<MoveAction>   moveAction_1   = nullptr;
+
+          std::shared_ptr<MoveAction>   moveAction_2  = nullptr;
+
+          if (!is_busy (healer->id))
+            {
+              if (dis == 1)
+                {
+                  // healer wait on place
+                  for (const Vec2Int p : get_poses_around (healer->position))
+                    {
+                      if (!is_correct (p))
+                        continue;
+                      const int p_id = map_id[p.x][p.y];
+                      if (p_id == -1)
+                        continue;
+                      Entity &entity = get_entity_by_id (p_id);
+                      if (   is_place_contain (p.x, p.y, RESOURCE)
+                          || (is_place_contain_enemy (p.x, p.y) && entity.health > 0))
+                        {
+                          atackAction_1 = std::shared_ptr<AttackAction> (new AttackAction (std::shared_ptr<int> (new int (p_id)), nullptr));
+                          break;
+                        }
+                      if (is_place_contain_us (p.x, p.y))
+                        {
+                          const EntityProperties &p_prop = playerView->entityProperties.at (type);
+                          if (entity.health < p_prop.maxHealth)
+                            {
+                              repairAction_1 = std::shared_ptr<RepairAction> (new RepairAction (p_id));
+                              break;
+                            }
+                        }
+                    }
+                }
+              else
+                {
+                  Vec2Int new_pos = healer->position;
+                  if (std::abs (healer->position.x - entity.position.x) > std::abs(healer->position.y - entity.position.y))
+                    new_pos.x -= my_sign (healer->position.x - entity.position.x);
+                  else
+                    new_pos.y -= my_sign (healer->position.y - entity.position.y);
+                  if (!is_place_free (new_pos))
+                    continue;
+
+                  moveAction_1 = std::shared_ptr<MoveAction> (new MoveAction (new_pos, false, true));
+                }
+
+              {
+                Vec2Int new_pos = entity.position;
+                if (std::abs (healer->position.x - entity.position.x) > std::abs(healer->position.y - entity.position.y))
+                  new_pos.x += my_sign (healer->position.x - entity.position.x);
+                else
+                  new_pos.y += my_sign (healer->position.y - entity.position.y);
+                if (!is_place_free (new_pos))
+                  continue;
+                moveAction_2 = std::shared_ptr<MoveAction> (new MoveAction (new_pos, false, true));
+              }
+
+              result->entityActions[healer->id] = EntityAction (moveAction_1, nullptr, atackAction_1, repairAction_1);
+              make_busy (healer->id);
+            }
+
+          result->entityActions[entity.id] = EntityAction (moveAction_2, nullptr, nullptr, nullptr);
+          make_busy (entity.id);
+          break;
+        }
+    }
+}
+
 void game_step_t::run_tasks ()
 {
   std::unordered_set<int> finished;
@@ -1649,4 +1763,11 @@ int game_step_t::choose_atack_pos (const Vec2Int old_pos)
   while (destroyed_pos.count (dir));
 
   return dir;
+}
+
+int my_sign (const int a)
+{
+  if (a > 0) return 1;
+  if (a < 0) return -1;
+  return 0;
 }

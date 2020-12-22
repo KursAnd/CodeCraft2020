@@ -132,12 +132,12 @@ public:
   void attack_out_zone ();
   void attack_others_in_zone ();
   void attack_others_out_zone ();
+  void attack_try_heal ();
   void builder_step_back ();
   void move_army (const EntityType type);
   void turn_on_turrets ();
   void heal_nearest ();
   void protect_base ();
-
 
   void run_tasks ();
   void make_atack_groups ();
@@ -146,3 +146,6 @@ public:
   int get_attack_pos_id_by_vec (const Vec2Int pos) const;
   int choose_atack_pos (const Vec2Int old_pos = Vec2Int (-1, -1));
 };
+
+
+int my_sign (const int a);
