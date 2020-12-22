@@ -1055,8 +1055,23 @@ void game_step_t::attack_step_back ()
               map[best_pos.x][best_pos.y] = entity.entityType + 10;
             }
         }
-      else if (map_run[pos.x][pos.y] == 1)
+      if (map_run[pos.x][pos.y] == 1 || moveAction == nullptr)
         {
+          // try to hit someone from that place
+          for (const EntityType enemy_type : {TURRET, BUILDER_UNIT, MELEE_BASE, RANGED_BASE, BUILDER_BASE, HOUSE, WALL})
+            {
+              for (Entity &enemy : get_enemy_vector (enemy_type))
+                {
+                  if (enemy.health <= 0 || get_distance (entity, enemy) > prop.attack->attackRange)
+                    continue;
+
+                  atackAction  = std::shared_ptr<AttackAction> (new AttackAction (std::shared_ptr<int> (new int (enemy.id)), nullptr));
+                  enemy.health -= prop.attack->damage;
+                  break;
+                }
+              if (atackAction)
+                break;
+            }
         }
 
       result->entityActions[entity.id] = EntityAction (moveAction, nullptr, atackAction, nullptr);
