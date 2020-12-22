@@ -763,11 +763,9 @@ void game_step_t::try_build (const EntityType buildType)
 
       std::shared_ptr<MoveAction>   moveAction   = std::shared_ptr<MoveAction> (new MoveAction (best_pos, true, true));
       std::shared_ptr<BuildAction>  buildAction  = std::shared_ptr<BuildAction> (new BuildAction (buildType, build_pos));
-      std::shared_ptr<AttackAction> atackAction  = nullptr;
-      std::shared_ptr<RepairAction> repairAction = nullptr;
 
       make_busy (*entity);
-      result->entityActions[entity->id] = EntityAction (moveAction, buildAction, atackAction, repairAction);
+      result->entityActions[entity->id] = EntityAction (moveAction, buildAction, nullptr, nullptr);
       builders_cnt++;
       map[best_pos.x][best_pos.y] = BUILDER_UNIT + 10; // hack 
       // map_id[best_pos.x][best_pos.y] = entity->id; // TO-DO: I'm not sure in it
@@ -784,10 +782,7 @@ void game_step_t::train_unit (const EntityType factoryType)
       const EntityProperties &properties = playerView->entityProperties.at (entity.entityType);
       EntityType buildType = properties.build->options[0];
 
-      std::shared_ptr<MoveAction>   moveAction   = nullptr;
       std::shared_ptr<BuildAction>  buildAction  = nullptr;
-      std::shared_ptr<AttackAction> atackAction  = nullptr;
-      std::shared_ptr<RepairAction> repairAction = nullptr;
 
       if (need_build (buildType))
         {
@@ -827,7 +822,7 @@ void game_step_t::train_unit (const EntityType factoryType)
           buy_entity (buildType);
         }
 
-      result->entityActions[entity.id] = EntityAction (moveAction, buildAction, atackAction, repairAction);
+      result->entityActions[entity.id] = EntityAction (nullptr, buildAction, nullptr, nullptr);
     }
 }
 
@@ -879,13 +874,11 @@ void game_step_t::check_repair (const EntityType repairType)
             break;
 
           std::shared_ptr<MoveAction>   moveAction   = std::shared_ptr<MoveAction> (new MoveAction (best_pos, true, true));
-          std::shared_ptr<BuildAction>  buildAction  = nullptr;
-          std::shared_ptr<AttackAction> atackAction  = nullptr;
           std::shared_ptr<RepairAction> repairAction = std::shared_ptr<RepairAction> (new RepairAction (repair_entity.id));
 
           //add_repair_task (entity->id, repair_entity.id);
           make_busy (entity->id);
-          result->entityActions[entity->id] = EntityAction (moveAction, buildAction, atackAction, repairAction);
+          result->entityActions[entity->id] = EntityAction (moveAction, nullptr, nullptr, repairAction);
           repairs_cnt++;
           map[best_pos.x][best_pos.y] = BUILDER_UNIT + 10; // hack 
           map_id[best_pos.x][best_pos.y] = entity->id; // TO-DO: I'm not sure in it
@@ -1106,7 +1099,6 @@ void game_step_t::attack_step_back_from_melee ()
         continue;
 
       std::shared_ptr<MoveAction>   moveAction   = nullptr;
-      std::shared_ptr<AttackAction> atackAction  = nullptr;
       if (map_run_melee[pos.x][pos.y] == 2)
         {
           Vec2Int best_pos = get_step_back_for_entity (entity, map_run_melee[pos.x][pos.y]); // use the same func as map_run
@@ -1117,7 +1109,7 @@ void game_step_t::attack_step_back_from_melee ()
             }
         }
 
-      result->entityActions[entity.id] = EntityAction (moveAction, nullptr, atackAction, nullptr);
+      result->entityActions[entity.id] = EntityAction (moveAction, nullptr, nullptr, nullptr);
       make_busy (entity.id);
     }
 }
@@ -1256,7 +1248,7 @@ void game_step_t::attack_out_zone ()
       const int min_life_stay_1 = enemy.health - enemy_near_us_free[2][enemy_id].size () * 5 - enemy_near_us_free[1][enemy_id].size () * 5;
       if (min_life_stay_1 > 0)
         {
-          if (enemy.entityType == TURRET)
+          if (enemy.entityType == TURRET) // TO-DO: refactor it
             {
               if (enemy_near_us[2][enemy_id].size () + enemy_near_us_free[1][enemy_id].size () < 5)
                 continue;
@@ -1273,7 +1265,7 @@ void game_step_t::attack_out_zone ()
           for (const Vec2Int p : get_poses_around (entity.position))
             {
               if (   !is_place_free (p)
-                  || (enemy.entityType == TURRET && get_build_distance (enemy.id, p) >= dist)
+                  || (enemy.entityType == TURRET && get_build_distance (enemy.id, p) >= dist) // TO-DO: refactor it
                   || (enemy.entityType != TURRET && get_distance (p, enemy.position) >= dist))
                 continue;
               best_pos = p;
@@ -1291,7 +1283,7 @@ void game_step_t::attack_out_zone ()
       const int min_life_stay_2 = enemy.health - enemy_near_us_free[2][enemy_id].size () * 5;
       if (min_life_stay_2 > 0)
         {
-          if (enemy.entityType == TURRET)
+          if (enemy.entityType == TURRET) // TO-DO: refactor it
             {
               if (enemy_near_us_free[2][enemy_id].size () < 5)
                 continue;
@@ -1308,7 +1300,7 @@ void game_step_t::attack_out_zone ()
           for (const Vec2Int p : get_poses_around (entity.position))
             {
               if (   !is_place_free (p)
-                  || (enemy.entityType == TURRET && get_build_distance (enemy.id, p) >= dist)
+                  || (enemy.entityType == TURRET && get_build_distance (enemy.id, p) >= dist) // TO-DO: refactor it
                   || (enemy.entityType != TURRET && get_distance (p, enemy.position) >= dist))
                 continue;
               best_pos = p;
@@ -1364,9 +1356,7 @@ void game_step_t::move_army (const EntityType type)
         continue;
 
       std::shared_ptr<MoveAction>   moveAction   = nullptr;
-      std::shared_ptr<BuildAction>  buildAction  = nullptr;
       std::shared_ptr<AttackAction> atackAction  = std::shared_ptr<AttackAction> (new AttackAction (nullptr, std::shared_ptr<AutoAttack> (new AutoAttack (properties.sightRange, {}))));
-      std::shared_ptr<RepairAction> repairAction = nullptr;
 
       if (!enemy_near_base_ids.empty ())
         {
@@ -1394,7 +1384,7 @@ void game_step_t::move_army (const EntityType type)
             moveAction = std::shared_ptr<MoveAction> (new MoveAction (Vec2Int (3 + rand () % 12, 20 + rand () % 4), true, false));
         }
 
-      result->entityActions[entity.id] = EntityAction (moveAction, buildAction, atackAction, repairAction);
+      result->entityActions[entity.id] = EntityAction (moveAction, nullptr, atackAction, nullptr);
       make_busy (entity.id);
     }
 }
@@ -1408,12 +1398,9 @@ void game_step_t::turn_on_turrets ()
     {
       if (is_busy (entity) || !entity.active)
         continue;
-      std::shared_ptr<MoveAction>   moveAction   = nullptr;
-      std::shared_ptr<BuildAction>  buildAction  = nullptr;
       std::shared_ptr<AttackAction> atackAction  = std::shared_ptr<AttackAction> (new AttackAction (nullptr, std::shared_ptr<AutoAttack> (new AutoAttack (properties.sightRange, {}))));
-      std::shared_ptr<RepairAction> repairAction = nullptr;
-
-      result->entityActions[entity.id] = EntityAction (moveAction, buildAction, atackAction, repairAction);
+      result->entityActions[entity.id] = EntityAction (nullptr, nullptr, atackAction, nullptr);
+      make_busy (entity.id);
     }
 }
 
@@ -1440,13 +1427,10 @@ void game_step_t::heal_nearest ()
           const EntityProperties &p = playerView->entityProperties.at (repair_entity.entityType);
           if (repair_entity.health < p.maxHealth)
             {
-              std::shared_ptr<MoveAction>   moveAction   = nullptr;
-              std::shared_ptr<BuildAction>  buildAction  = nullptr;
-              std::shared_ptr<AttackAction> atackAction  = nullptr;
               std::shared_ptr<RepairAction> repairAction = std::shared_ptr<RepairAction> (new RepairAction (repair_entity.id));
 
               make_busy (healer.id);
-              result->entityActions[healer.id] = EntityAction (moveAction, buildAction, atackAction, repairAction);
+              result->entityActions[healer.id] = EntityAction (nullptr, nullptr, nullptr, repairAction);
               break;
             }
         }
@@ -1488,7 +1472,7 @@ void game_step_t::run_tasks ()
             }
         }
 
-      if (map_run[entity.position.x][entity.position.y] != 0)
+      if (entity.entityType == RANGED_UNIT && map_run[entity.position.x][entity.position.y] != 0)
         pos = pos; // smth wrong
 
       const EntityProperties &properties = playerView->entityProperties.at (get_entity_by_id (id).entityType);
@@ -1548,31 +1532,22 @@ void game_step_t::make_atack_groups ()
       int dir = choose_atack_pos ();
       if (dir < 0)
         return;
-      for (const Entity &entity : get_vector (RANGED_UNIT))
+
+      for (const EntityType type : {RANGED_UNIT, MELEE_UNIT})
         {
-          if (rand () % 10 == 0 || is_busy (entity)) // 90%
-            continue;
-          
-          const EntityProperties &properties = playerView->entityProperties.at (entity.entityType);
-          std::shared_ptr<MoveAction>   moveAction   = std::shared_ptr<MoveAction> (new MoveAction (attack_pos[dir], true, true));
-          std::shared_ptr<AttackAction> atackAction  = std::shared_ptr<AttackAction> (new AttackAction (nullptr, std::shared_ptr<AutoAttack> (new AutoAttack (properties.sightRange, {}))));
+          for (const Entity &entity : get_vector (type))
+            {
+              if (rand () % 10 == 0 || is_busy (entity)) // 90%
+                continue;
 
-          result->entityActions[entity.id] = EntityAction (moveAction, nullptr, atackAction, nullptr);
-          game_step_t::attack_move_tasks[entity.id] = attack_pos[dir];
-          make_busy (entity.id);
-        }
-      for (const Entity &entity : get_vector (MELEE_UNIT))
-        {
-          if (rand () % 20 == 0 || is_busy (entity)) // 95%
-            continue;
+              const EntityProperties &properties = playerView->entityProperties.at (entity.entityType);
+              std::shared_ptr<MoveAction>   moveAction   = std::shared_ptr<MoveAction> (new MoveAction (attack_pos[dir], true, true));
+              std::shared_ptr<AttackAction> atackAction  = std::shared_ptr<AttackAction> (new AttackAction (nullptr, std::shared_ptr<AutoAttack> (new AutoAttack (properties.sightRange, {}))));
 
-          const EntityProperties &properties = playerView->entityProperties.at (entity.entityType);
-          std::shared_ptr<MoveAction>   moveAction   = std::shared_ptr<MoveAction> (new MoveAction (attack_pos[dir], true, true));
-          std::shared_ptr<AttackAction> atackAction  = std::shared_ptr<AttackAction> (new AttackAction (nullptr, std::shared_ptr<AutoAttack> (new AutoAttack (properties.sightRange, {}))));
-
-          result->entityActions[entity.id] = EntityAction (moveAction, nullptr, atackAction, nullptr);
-          game_step_t::attack_move_tasks[entity.id] = attack_pos[dir];
-          make_busy (entity.id);
+              result->entityActions[entity.id] = EntityAction (moveAction, nullptr, atackAction, nullptr);
+              game_step_t::attack_move_tasks[entity.id] = attack_pos[dir];
+              make_busy (entity.id);
+            }
         }
     }
 }
