@@ -1468,7 +1468,7 @@ void game_step_t::heal_nearest ()
               || (repair_entity.entityType != RANGED_UNIT && repair_entity.entityType != MELEE_UNIT && repair_entity.entityType != BUILDER_UNIT))
             continue;
           const EntityProperties &p = playerView->entityProperties.at (repair_entity.entityType);
-          if (repair_entity.health < p.maxHealth)
+          if (repair_entity.health <= p.maxHealth - 5 /*average attack*/)
             {
               std::shared_ptr<RepairAction> repairAction = std::shared_ptr<RepairAction> (new RepairAction (repair_entity.id));
 
