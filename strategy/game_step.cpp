@@ -1317,7 +1317,7 @@ void game_step_t::attack_out_zone ()
     }
 }
 
-void game_step_t::attack_others ()
+void game_step_t::attack_others_in_zone ()
 {
   // HERE SHOULD STAY ONLY INACTIVE TURRETS
   for (const EntityType enemy_type : {TURRET, BUILDER_UNIT, MELEE_BASE, RANGED_BASE, BUILDER_BASE, HOUSE, WALL})
@@ -1339,6 +1339,34 @@ void game_step_t::attack_others ()
                   result->entityActions[entity.id] = EntityAction (nullptr, nullptr, atackAction, nullptr);
                   make_busy (entity.id);
                   enemy.health -= prop.attack->damage;
+                  break;
+                }
+            }
+        }
+    }
+}
+
+void game_step_t::attack_others_out_zone ()
+{
+  for (const EntityType enemy_type : {RANGED_UNIT, MELEE_UNIT, BUILDER_UNIT, MELEE_BASE, RANGED_BASE, BUILDER_BASE, HOUSE, TURRET, WALL})
+    {
+      for (const EntityType type : {MELEE_UNIT, RANGED_UNIT})
+        {
+          const EntityProperties &prop = playerView->entityProperties.at (type);
+          for (const Entity &entity : get_vector (type))
+            {
+              if (is_busy (entity))
+                continue;
+              for (Entity &enemy : get_enemy_vector (enemy_type))
+                {
+                  if (enemy.health <= 0 || get_distance (entity, enemy) > prop.sightRange)
+                    continue;
+
+                  std::shared_ptr<MoveAction>   moveAction   = std::shared_ptr<MoveAction> (new MoveAction (enemy.position, false, true));
+                  std::shared_ptr<AttackAction> atackAction  = std::shared_ptr<AttackAction> (new AttackAction (std::shared_ptr<int> (new int (enemy.id)), nullptr));
+                  result->entityActions[entity.id] = EntityAction (moveAction, nullptr, atackAction, nullptr);
+                  make_busy (entity.id);
+                  break;
                 }
             }
         }

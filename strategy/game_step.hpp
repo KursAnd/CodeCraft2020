@@ -130,7 +130,8 @@ public:
   void attack_step_back ();
   void attack_step_back_from_melee ();
   void attack_out_zone ();
-  void attack_others ();
+  void attack_others_in_zone ();
+  void attack_others_out_zone ();
   void builder_step_back ();
   void move_army (const EntityType type);
   void turn_on_turrets ();
