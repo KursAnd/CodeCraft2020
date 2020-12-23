@@ -881,7 +881,26 @@ void game_step_t::move_builders ()
   const EntityType type = BUILDER_UNIT;
   const EntityProperties &properties = playerView->entityProperties.at (type);
 
-  std::unordered_set<int> tree_was;
+  std::unordered_map<int, int> tree_available;
+  for (const Entity &tree : get_vector (RESOURCE))
+    {
+      for (const Vec2Int p : get_poses_around (tree.position))
+        {
+          if (is_place_free (p))
+            ++tree_available[tree.id];
+          else if (   is_correct (p)
+                   && map_id[p.x][p.y] != -1
+                   && get_entity_by_id (map_id[p.x][p.y]).entityType == BUILDER_UNIT
+                   && !is_busy (map_id[p.x][p.y]))
+            {
+              const int id = map_id[p.x][p.y];
+              std::shared_ptr<AttackAction> atackAction = std::shared_ptr<AttackAction> (new AttackAction (std::shared_ptr<int> (new int (tree.id)), nullptr));
+              result->entityActions[id] = EntityAction (nullptr, nullptr, atackAction, nullptr);
+              make_busy (id);
+            }
+        }
+    }
+
   for (const Entity &entity : get_vector (type))
     {
       if (is_busy (entity))
@@ -891,20 +910,8 @@ void game_step_t::move_builders ()
       int dis = get_max_distance ();
       for (Entity &tree : get_vector (RESOURCE))
         {
-          if (tree_was.count (tree.id))
+          if (tree_available[tree.id] == 0)
             continue;
-          bool tree_is_available = false;
-          for (const Vec2Int p : get_poses_around (tree.position))
-            {
-              if (is_place_free_or_my (p.x, p.y, entity.id))
-                {
-                  tree_is_available = true;
-                  break;
-                }
-            }
-          if (!tree_is_available)
-            continue;
-
           int temp_dis = get_distance (entity.position, tree.position);
           if (dis > temp_dis)
             {
@@ -921,7 +928,7 @@ void game_step_t::move_builders ()
         {
           moveAction  = std::shared_ptr<MoveAction> (new MoveAction (aim_tree->position, true, true));
           atackAction = std::shared_ptr<AttackAction> (new AttackAction (std::shared_ptr<int> (new int (aim_tree->id)), nullptr));
-          tree_was.insert (aim_tree->id);
+          --tree_available[aim_tree->id];
         }
       else
         {
