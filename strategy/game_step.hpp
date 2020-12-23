@@ -36,8 +36,6 @@ private:
   int m_population_max_future = 0; // include inactive houses
   int m_population_use = 0;
 
-  std::unordered_set<int> tree_was;
-  Vec2Int m_res_pos;  // purpouse for BUILDERs who collect thr resources
   const Vec2Int INCORRECT_VEC2INT = Vec2Int(-1, -1);
 
   struct find_id_t
@@ -84,7 +82,6 @@ public:
   int get_count (const EntityType type) const;
   int get_army_count () const;
   int get_base_count () const;
-  Vec2Int get_res_pos () const;
   Vec2Int get_step_back_for_entity (const Entity &entity, const int level) const;
   std::vector<Entity> &get_vector (const EntityType type);
   const std::vector<Entity> &get_vector (const EntityType type) const;

@@ -14,8 +14,7 @@ std::unordered_set<int> game_step_t::protect_task;
 
 
 game_step_t::game_step_t (const PlayerView &_playerView, Action &_result)
-  : playerView (&_playerView), result (&_result),
-    m_res_pos (_playerView.mapSize - 1, _playerView.mapSize - 1)
+  : playerView (&_playerView), result (&_result)
 {
   // hack to avoid const wraper that doesn't work on platform ..
   for (const EntityType type : {WALL, HOUSE, BUILDER_BASE, BUILDER_UNIT, MELEE_BASE,  MELEE_UNIT, RANGED_BASE, RANGED_UNIT, RESOURCE, TURRET})
@@ -60,13 +59,8 @@ game_step_t::game_step_t (const PlayerView &_playerView, Action &_result)
         {
           m_entity_by_id[entity.id] = find_id_t (false, entity.entityType, m_entity[entity.entityType].size ());
           m_entity[entity.entityType].push_back (entity);
-          if (m_res_pos.x + m_res_pos.y > entity.position.x + entity.position.y)
-            m_res_pos = entity.position;
         }
     }
-
-  if (m_res_pos.x == _playerView.mapSize - 1 && m_res_pos.y == _playerView.mapSize - 1)
-    m_res_pos = Vec2Int (0, 0);
 
   calculate_enemies_near_base ();
 
@@ -343,11 +337,6 @@ void game_step_t::make_busy (const Entity &entity)
 void game_step_t::make_busy (const int id)
 {
   ids_was.insert (id);
-}
-
-Vec2Int game_step_t::get_res_pos () const
-{
-  return m_res_pos;
 }
 
 Vec2Int game_step_t::get_step_back_for_entity (const Entity &entity, const int level) const
@@ -892,6 +881,7 @@ void game_step_t::move_builders ()
   const EntityType type = BUILDER_UNIT;
   const EntityProperties &properties = playerView->entityProperties.at (type);
 
+  std::unordered_set<int> tree_was;
   for (const Entity &entity : get_vector (type))
     {
       if (is_busy (entity))
