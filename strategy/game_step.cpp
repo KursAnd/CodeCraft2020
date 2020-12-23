@@ -89,14 +89,12 @@ game_step_t::game_step_t (const PlayerView &_playerView, Action &_result)
   map_id = std::vector<std::vector<int>> (playerView->mapSize);
   map_damage = std::vector<std::vector<int>> (playerView->mapSize);
   map_damage_melee = std::vector<std::vector<int>> (playerView->mapSize);
-  map_damage_who = std::vector<std::vector<std::unordered_set<int>>> (playerView->mapSize);
   for (int i = 0; i < playerView->mapSize; ++i)
     {
       map[i] = std::vector<int> (playerView->mapSize, custom_value);
       map_id[i] = std::vector<int> (playerView->mapSize, -1);
       map_damage[i] = std::vector<int> (playerView->mapSize, 0);
       map_damage_melee[i] = std::vector<int> (playerView->mapSize, 0);
-      map_damage_who[i] = std::vector<std::unordered_set<int>> (playerView->mapSize, std::unordered_set<int> ());
     }
   if (playerView->fogOfWar)
     {
@@ -310,13 +308,6 @@ void game_step_t::set_map_damage (const Entity &entity, bool add)
       map_damage[pos.x][pos.y] += add ? p.attack->damage : -p.attack->damage;
       if (entity.entityType == MELEE_UNIT)
         map_damage_melee[pos.x][pos.y] += add ? p.attack->damage : -p.attack->damage;
-      else
-        {
-          if (add)
-            map_damage_who[pos.x][pos.y].insert (entity.id);
-          else
-            map_damage_who[pos.x][pos.y].erase (entity.id);
-        }
     }
 }
 
@@ -410,12 +401,10 @@ void game_step_t::recalculate_map_run ()
 {
   map_run = std::vector<std::vector<int>> (playerView->mapSize);
   map_run_melee = std::vector<std::vector<int>> (playerView->mapSize);
-  map_damage_who_run = std::vector<std::vector<std::unordered_set<int>>> (playerView->mapSize);
   for (int i = 0; i < playerView->mapSize; ++i)
     {
       map_run[i] = std::vector<int> (playerView->mapSize, 0);
       map_run_melee[i] = std::vector<int> (playerView->mapSize, 0);
-      map_damage_who_run[i] = std::vector<std::unordered_set<int>> (playerView->mapSize, std::unordered_set<int> ());
     }
 
   // attack zone
@@ -426,7 +415,6 @@ void game_step_t::recalculate_map_run ()
           map_run[x][y] = 3;
         if (map_damage_melee[x][y] > 0)
           map_run_melee[x][y] = 3;
-        map_damage_who_run[x][y] = map_damage_who[x][y];
       }
 
   // set map_<>[x1][y1] = lv1 if map_<>[x1][y1] == 0 && map_<>[x2][y2] == lv2
@@ -435,9 +423,6 @@ void game_step_t::recalculate_map_run ()
       if (map_run[x1][y1] == 0 && map_run[x2][y2] == lv2)
         {
           map_run[x1][y1] = lv1;
-          map_damage_who_run[x1][y1] =   lv2 == 3
-                                       ? map_damage_who[x2][y2]
-                                       : map_damage_who_run[x2][y2];
         }
       if (map_run_melee[x1][y1] == 0 && map_run_melee[x2][y2] == lv2)
         map_run_melee[x1][y1] = lv1;
