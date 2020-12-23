@@ -704,7 +704,7 @@ int game_step_t::count_workers_to_repair (const EntityType type) const
       case BUILDER_BASE:
       case MELEE_BASE:
       case RANGED_BASE:
-        return 10;
+        return std::min (10, get_count (BUILDER_UNIT) / 2);
       case HOUSE:
       case TURRET:
         return 3;
