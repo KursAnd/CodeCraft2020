@@ -871,7 +871,7 @@ void game_step_t::move_builders ()
     {
       for (const Vec2Int p : get_poses_around (tree.position))
         {
-          if (is_place_free (p))
+          if (is_place_free (p) && map_damage[p.x][p.y] == 0)
             ++tree_available[tree.id];
           else if (   is_correct (p)
                    && map_id[p.x][p.y] != -1
