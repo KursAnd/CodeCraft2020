@@ -550,7 +550,7 @@ bool game_step_t::is_empty_space_for_type (const Vec2Int pos, const EntityType t
 
 bool game_step_t::is_place_free_or_my (const int x, const int y, const int id) const
 {
-  return is_place_free (x, y) || map_id.at (x).at (y) == id;
+  return is_place_free (x, y) || (is_correct_xy (x, y) && map_id.at (x).at (y) == id);
 }
 
 bool game_step_t::is_place_free (const Vec2Int pos) const
@@ -903,12 +903,26 @@ void game_step_t::move_builders ()
         {
           if (tree_was.count (tree.id))
             continue;
+          bool tree_is_available = false;
+          for (const Vec2Int p : get_poses_around (tree.position))
+            {
+              if (is_place_free_or_my (p.x, p.y, entity.id))
+                {
+                  tree_is_available = true;
+                  break;
+                }
+            }
+          if (!tree_is_available)
+            continue;
+
           int temp_dis = get_distance (entity.position, tree.position);
           if (dis > temp_dis)
             {
               dis = temp_dis;
               aim_tree = &tree;
             }
+          if (dis == 1)
+            break;
         }
 
       std::shared_ptr<MoveAction>   moveAction   = nullptr;
