@@ -22,6 +22,8 @@ private:
   bool builders_is_attakers = false;
 
   const int MIN_BUILDER_UNITS = 30;
+  const int MIN_RANGED_UNITS = 20;
+  const int MIN_BUILDER_UNITS_2 = 50;
   const int MAX_LINES_OF_HOUSES = 10;
   const int MAX_POSITION_OF_RANGED_BASE = 17;
   const int MIN_POSITION_RANGED_DO_STEP_BACK = 20;

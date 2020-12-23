@@ -234,9 +234,10 @@ bool game_step_t::need_build (const EntityType type) const
     return false;
   switch (type)
     {
-      case BUILDER_UNIT: return (   get_count (BUILDER_UNIT) < std::max (MIN_BUILDER_UNITS, m_population_max * 4 / 10)
-                                 || get_count (RANGED_UNIT) == 0)
-                             && get_count (RESOURCE) > get_count (BUILDER_UNIT)
+      case BUILDER_UNIT: return (   (get_count (RANGED_UNIT) <  MIN_RANGED_UNITS && get_count (BUILDER_UNIT) < std::max (MIN_BUILDER_UNITS  , m_population_max * 4 / 10)) // 40%, min = 30
+                                 || (get_count (RANGED_UNIT) >= MIN_RANGED_UNITS && get_count (BUILDER_UNIT) < std::max (MIN_BUILDER_UNITS_2, m_population_max * 5 / 10)) // 50%, min = 50
+                                 ||  get_count (RANGED_UNIT) == 0)
+                             && get_count (RESOURCE) > get_count (BUILDER_UNIT) * 2
                              && !builders_is_attakers;
       case RANGED_UNIT : return get_count (BUILDER_UNIT) >= MIN_BUILDER_UNITS
                              || !game_step_t::enemy_near_base_ids.empty ();
