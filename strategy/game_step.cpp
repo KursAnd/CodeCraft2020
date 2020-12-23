@@ -234,7 +234,8 @@ bool game_step_t::need_build (const EntityType type) const
       case RANGED_UNIT : return get_count (BUILDER_UNIT) >= MIN_BUILDER_UNITS
                              || !game_step_t::enemy_near_base_ids.empty ();
       case MELEE_UNIT  : return !can_build (RANGED_UNIT)
-                             && !game_step_t::enemy_near_base_ids.empty ();
+                             && !game_step_t::enemy_near_base_ids.empty ()
+                             && get_count (RANGED_UNIT) < 5;
 
       case HOUSE       :
         return m_population_use + 10 > m_population_max_future
