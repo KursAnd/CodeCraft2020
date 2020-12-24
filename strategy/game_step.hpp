@@ -37,6 +37,7 @@ private:
   const int BASE_PROTECT_DISTANCE = 20;
 
   std::vector<int> enemy_near_base_ids;
+  int base_zone_x = 0, base_zone_y = 0;
 
   int m_id = 0;
   int m_resource = 0;

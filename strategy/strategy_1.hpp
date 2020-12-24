@@ -43,8 +43,8 @@ void strategy_1 (const PlayerView& playerView, DebugInterface* debugInterface, A
   gs.try_build (BUILDER_BASE);
   gs.try_build (RANGED_BASE);
   //gs.try_build (MELEE_BASE);
+  gs.try_build (TURRET);
   gs.try_build (HOUSE);
-  //gs.try_build (TURRET);
   //gs.try_build (WALL);
 
 

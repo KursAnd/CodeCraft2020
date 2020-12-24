@@ -216,6 +216,38 @@ Vec2Int game_step_t::get_place_for (const EntityType type) const
         }
       return pos;
     }
+  else if (type == TURRET)
+    {
+      for (const Entity &entity : get_vector (BUILDER_UNIT))
+        {
+          if (is_busy (entity))
+            continue;
+
+          bool safe = true;
+          for (const Vec2Int p : get_all_poses_in_area_of_entity (entity, BASE_PROTECT_DISTANCE))
+            {
+              if (map_id[p.x][p.y] == -1 || !m_entity_by_id.at (map_id[p.x][p.y]).is_enemy)
+                continue;
+
+              const EntityType enemy_type = get_entity_by_id (map_id[p.x][p.y]).entityType;
+              if (type != RANGED_UNIT && type != MELEE_UNIT)
+                continue;
+
+              safe = false;
+              break;
+            }
+          if (!safe)
+            continue;
+
+          const Vec2Int p = entity.position;
+          for (const Vec2Int pos : {Vec2Int (p.x - 2, p.y - 1), Vec2Int (p.x - 2, p.y    ), Vec2Int (p.x - 1, p.y + 1), Vec2Int (p.x    , p.y + 1),
+                                    Vec2Int (p.x + 1, p.y    ), Vec2Int (p.x + 1, p.y - 1), Vec2Int (p.x    , p.y - 2), Vec2Int (p.x - 1, p.y - 2)})
+            {
+              if (is_correct (pos) && is_empty_space_for_type (pos, TURRET))
+                return pos;
+            }
+        }
+    }
   return INCORRECT_VEC2INT;
 }
 
@@ -243,10 +275,8 @@ bool game_step_t::need_build (const EntityType type) const
             && game_step_t::enemy_near_base_ids.empty ();
       case TURRET      :
         return get_count (BUILDER_UNIT) >= MIN_BUILDER_UNITS
-            && m_population_use > 30
-            && 1.0 * m_population_use / m_population_max > 0.65
-            && get_count (BUILDER_BASE) > 0
-            && get_count (RANGED_BASE) > 0
+            && get_count (HOUSE) >= 10
+            && (get_count (TURRET) < 7 || m_resource > 500)
             && game_step_t::enemy_near_base_ids.empty ();
       case WALL        :
         return get_count (BUILDER_UNIT) >= MIN_BUILDER_UNITS
@@ -459,7 +489,6 @@ void game_step_t::recalculate_map_run ()
 
 void game_step_t::calculate_enemies_near_base ()
 {
-  int base_zone_x = 0, base_zone_y = 0;
   for (const EntityType type : {BUILDER_BASE, RANGED_BASE, MELEE_BASE, HOUSE, WALL, TURRET}) // TO-DO: think about TURRET
     {
       const EntityProperties &p = playerView->entityProperties.at (type);
@@ -715,8 +744,9 @@ int game_step_t::count_workers_to_repair (const EntityType type) const
       case RANGED_BASE:
         return std::min (10, get_count (BUILDER_UNIT) / 2);
       case HOUSE:
-      case TURRET:
         return 3;
+      case TURRET:
+        return 8;
       case WALL:
         return 2;
     }
