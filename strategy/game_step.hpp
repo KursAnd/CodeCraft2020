@@ -138,7 +138,7 @@ public:
   void attack_others_out_zone ();
   void attack_try_heal ();
   void builder_step_back ();
-  void move_army (const EntityType type);
+  void move_army ();
   void turn_on_turrets ();
   void heal_nearest ();
   void protect_base ();

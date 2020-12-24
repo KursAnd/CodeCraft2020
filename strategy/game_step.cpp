@@ -1395,47 +1395,50 @@ void game_step_t::attack_others_out_zone ()
     }
 }
 
-void game_step_t::move_army (const EntityType type)
+void game_step_t::move_army ()
 {
-  const EntityProperties &properties = playerView->entityProperties.at (type);
-
-  int dir = choose_atack_pos ();
-  for (const Entity &entity : get_vector (type))
+  for (const EntityType type : {RANGED_UNIT, MELEE_UNIT})
     {
-      if (is_busy (entity))
-        continue;
+      const EntityProperties &properties = playerView->entityProperties.at (type);
 
-      std::shared_ptr<MoveAction>   moveAction   = nullptr;
-      std::shared_ptr<AttackAction> atackAction  = std::shared_ptr<AttackAction> (new AttackAction (nullptr, std::shared_ptr<AutoAttack> (new AutoAttack (properties.sightRange, {}))));
-
-      if (!enemy_near_base_ids.empty ())
+      int dir = choose_atack_pos ();
+      for (const Entity &entity : get_vector (type))
         {
-          Vec2Int pos = INCORRECT_VEC2INT;
-          int dis = get_max_distance ();
-          for (const int enemy_id : enemy_near_base_ids)
+          if (is_busy (entity))
+            continue;
+
+          std::shared_ptr<MoveAction>   moveAction   = nullptr;
+          std::shared_ptr<AttackAction> atackAction  = std::shared_ptr<AttackAction> (new AttackAction (nullptr, std::shared_ptr<AutoAttack> (new AutoAttack (properties.sightRange, {}))));
+
+          if (!enemy_near_base_ids.empty ())
             {
-              Entity &enemy = get_entity_by_id (enemy_id);
-              int new_dis = get_distance (entity.position, enemy.position);
-              if (dis > new_dis)
+              Vec2Int pos = INCORRECT_VEC2INT;
+              int dis = get_max_distance ();
+              for (const int enemy_id : enemy_near_base_ids)
                 {
-                  pos = enemy.position;
-                  dis = new_dis;
+                  Entity &enemy = get_entity_by_id (enemy_id);
+                  int new_dis = get_distance (entity.position, enemy.position);
+                  if (dis > new_dis)
+                    {
+                      pos = enemy.position;
+                      dis = new_dis;
+                    }
                 }
+              moveAction = std::shared_ptr<MoveAction> (new MoveAction (pos, true, true));
             }
-          moveAction = std::shared_ptr<MoveAction> (new MoveAction (pos, true, true));
-        }
-      else
-        {
-          if (entity.id % 4 < 2)
-            moveAction = std::shared_ptr<MoveAction> (new MoveAction (Vec2Int (10 + rand () % 13, 10 + rand () % 13), true, false));
-          else if (entity.id % 4 == 2)
-            moveAction = std::shared_ptr<MoveAction> (new MoveAction (Vec2Int (20 + rand () % 4, 3 + rand () % 12), true, false));
           else
-            moveAction = std::shared_ptr<MoveAction> (new MoveAction (Vec2Int (3 + rand () % 12, 20 + rand () % 4), true, false));
-        }
+            {
+              if (entity.id % 4 < 2)
+                moveAction = std::shared_ptr<MoveAction> (new MoveAction (Vec2Int (10 + rand () % 13, 10 + rand () % 13), true, false));
+              else if (entity.id % 4 == 2)
+                moveAction = std::shared_ptr<MoveAction> (new MoveAction (Vec2Int (20 + rand () % 4, 3 + rand () % 12), true, false));
+              else
+                moveAction = std::shared_ptr<MoveAction> (new MoveAction (Vec2Int (3 + rand () % 12, 20 + rand () % 4), true, false));
+            }
 
-      result->entityActions[entity.id] = EntityAction (moveAction, nullptr, atackAction, nullptr);
-      make_busy (entity.id);
+          result->entityActions[entity.id] = EntityAction (moveAction, nullptr, atackAction, nullptr);
+          make_busy (entity.id);
+        }
     }
 }
 

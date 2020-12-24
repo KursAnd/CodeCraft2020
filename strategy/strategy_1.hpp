@@ -23,12 +23,11 @@ void strategy_1 (const PlayerView& playerView, DebugInterface* debugInterface, A
   gs.builder_step_back ();
   gs.heal_nearest ();
   gs.attack_try_heal ();
+
   gs.run_tasks ();
   //gs.protect_base ();
   gs.make_atack_groups ();
-  gs.move_army (RANGED_UNIT);
-  gs.move_army (MELEE_UNIT);
-
+  gs.move_army ();
 
   gs.check_repair (BUILDER_BASE);
   gs.check_repair (RANGED_BASE);
