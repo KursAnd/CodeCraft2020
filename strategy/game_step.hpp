@@ -33,6 +33,8 @@ private:
   const int MAX_LINES_OF_HOUSES = 10;
   const int MAX_POSITION_OF_RANGED_BASE = 17;
   const int MIN_POSITION_RANGED_DO_STEP_BACK = 20;
+  const int ATTACK_OTHERS_OUT_ZONE_DISTANCE = 20;
+  const int BASE_PROTECT_DISTANCE = 20;
 
   std::vector<int> enemy_near_base_ids;
 

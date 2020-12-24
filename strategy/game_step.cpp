@@ -470,7 +470,7 @@ void game_step_t::calculate_enemies_near_base ()
               const EntityProperties &p_enemy = playerView->entityProperties.at (enemy_type);
               for (const Entity &enemy : get_enemy_vector (enemy_type))
                 {
-                  if (get_distance (entity, enemy) <= p_enemy.sightRange)
+                  if (get_distance (entity, enemy) <= BASE_PROTECT_DISTANCE)
                     enemy_near_base_ids.push_back (enemy.id);
                 }
             }
@@ -1350,14 +1350,13 @@ void game_step_t::attack_others_out_zone ()
     {
       for (const EntityType type : {MELEE_UNIT, RANGED_UNIT})
         {
-          const EntityProperties &prop = playerView->entityProperties.at (type);
           for (const Entity &entity : get_vector (type))
             {
               if (is_busy (entity))
                 continue;
               for (Entity &enemy : get_enemy_vector (enemy_type))
                 {
-                  if (enemy.health <= 0 || get_distance (entity, enemy) > prop.sightRange)
+                  if (enemy.health <= 0 || get_distance (entity, enemy) > ATTACK_OTHERS_OUT_ZONE_DISTANCE)
                     continue;
 
                   std::shared_ptr<MoveAction>   moveAction   = std::shared_ptr<MoveAction> (new MoveAction (enemy.position, false, true));
