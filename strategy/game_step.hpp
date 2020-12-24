@@ -6,6 +6,13 @@
 #include <set>
 #include <functional>
 
+enum class game_type_t
+{
+  FOURxONE,
+  FOURxONEplus,
+  TWOxONE
+};
+
 class game_step_t
 {
 private:
@@ -84,7 +91,8 @@ public:
   const std::vector<Entity> &get_vector (const EntityType type) const;
   std::vector<Entity> &get_enemy_vector (const EntityType type);
   const std::vector<Entity> &get_enemy_vector (const EntityType type) const;
-  
+  game_type_t get_game_type ();
+
   bool is_busy (const int id) const;
   bool is_busy (const Entity &entity) const;
   bool is_empty_space_for_type (const Vec2Int pos, const EntityType type) const;

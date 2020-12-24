@@ -372,6 +372,15 @@ const std::vector<Entity> &game_step_t::get_enemy_vector (const EntityType type)
   return m_enemy.at (type);
 }
 
+game_type_t game_step_t::get_game_type ()
+{
+  if (playerView->players.size () == 2)
+    return game_type_t::TWOxONE;
+  if (playerView->fogOfWar)
+    return game_type_t::FOURxONEplus;
+  return game_type_t::FOURxONE;
+}
+
 int game_step_t::get_count (const EntityType type) const
 {
   if (!m_entity.count (type))
