@@ -222,9 +222,10 @@ Vec2Int game_step_t::get_place_for (const EntityType type) const
         {
           if (is_busy (entity))
             continue;
-
+          if (entity.position.x < 18 && entity.position.y < 18)
+            continue;
           bool safe = true;
-          for (const Vec2Int p : get_all_poses_in_area_of_entity (entity, BASE_PROTECT_DISTANCE))
+          for (const Vec2Int p : get_all_poses_in_area_of_entity (entity, 15))
             {
               if (map_id[p.x][p.y] == -1 || !m_entity_by_id.at (map_id[p.x][p.y]).is_enemy)
                 continue;
@@ -243,6 +244,8 @@ Vec2Int game_step_t::get_place_for (const EntityType type) const
           for (const Vec2Int pos : {Vec2Int (p.x - 2, p.y - 1), Vec2Int (p.x - 2, p.y    ), Vec2Int (p.x - 1, p.y + 1), Vec2Int (p.x    , p.y + 1),
                                     Vec2Int (p.x + 1, p.y    ), Vec2Int (p.x + 1, p.y - 1), Vec2Int (p.x    , p.y - 2), Vec2Int (p.x - 1, p.y - 2)})
             {
+              if (pos.x < 2 || pos.y < 2)
+                continue;
               if (is_correct (pos) && is_empty_space_for_type (pos, TURRET))
                 return pos;
             }
@@ -489,7 +492,7 @@ void game_step_t::recalculate_map_run ()
 
 void game_step_t::calculate_enemies_near_base ()
 {
-  for (const EntityType type : {BUILDER_BASE, RANGED_BASE, MELEE_BASE, HOUSE, WALL, TURRET}) // TO-DO: think about TURRET
+  for (const EntityType type : {BUILDER_BASE, RANGED_BASE, MELEE_BASE, HOUSE, WALL})
     {
       const EntityProperties &p = playerView->entityProperties.at (type);
       for (const Entity &entity : get_vector (type))
