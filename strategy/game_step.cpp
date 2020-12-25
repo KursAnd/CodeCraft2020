@@ -25,6 +25,11 @@ game_step_t::game_step_t (const PlayerView &_playerView, Action &_result)
   {
     attack_pos = {{playerView->mapSize - 5, 5}, {playerView->mapSize - 5, playerView->mapSize - 5}, {5, playerView->mapSize - 5}};
   }
+  if (get_game_type () == game_type_t::TWOxONE)
+    {
+      destroyed_pos.insert (0);
+      destroyed_pos.insert (2);
+    }
 
   m_id = playerView->myId;
   for (const auto &player : playerView->players)
@@ -222,7 +227,11 @@ Vec2Int game_step_t::get_place_for (const EntityType type) const
         {
           if (is_busy (entity))
             continue;
-          if (entity.position.x < 18 && entity.position.y < 18)
+          int min_turret_distance = 18;
+          if (get_game_type () == game_type_t::TWOxONE)
+            min_turret_distance = 24;
+
+          if (entity.position.x < min_turret_distance && entity.position.y < min_turret_distance)
             continue;
           bool safe = true;
           for (const Vec2Int p : get_all_poses_in_area_of_entity (entity, 15))
@@ -244,7 +253,7 @@ Vec2Int game_step_t::get_place_for (const EntityType type) const
           for (const Vec2Int pos : {Vec2Int (p.x - 2, p.y - 1), Vec2Int (p.x - 2, p.y    ), Vec2Int (p.x - 1, p.y + 1), Vec2Int (p.x    , p.y + 1),
                                     Vec2Int (p.x + 1, p.y    ), Vec2Int (p.x + 1, p.y - 1), Vec2Int (p.x    , p.y - 2), Vec2Int (p.x - 1, p.y - 2)})
             {
-              if (pos.x < 2 || pos.y < 2)
+              if (pos.x < 3 || pos.y < 3)
                 continue;
               if (is_correct (pos) && is_empty_space_for_type (pos, TURRET))
                 return pos;
@@ -279,7 +288,7 @@ bool game_step_t::need_build (const EntityType type) const
       case TURRET      :
         return get_count (BUILDER_UNIT) >= MIN_BUILDER_UNITS
             && get_count (HOUSE) >= 10
-            && (get_count (TURRET) < 7 || m_resource > 500)
+            && (get_count (TURRET) < 7 || m_resource > 500 || rand () % 20 == 0)
             && game_step_t::enemy_near_base_ids.empty ();
       case WALL        :
         return get_count (BUILDER_UNIT) >= MIN_BUILDER_UNITS
@@ -404,7 +413,7 @@ const std::vector<Entity> &game_step_t::get_enemy_vector (const EntityType type)
   return m_enemy.at (type);
 }
 
-game_type_t game_step_t::get_game_type ()
+game_type_t game_step_t::get_game_type () const
 {
   if (playerView->players.size () == 2)
     return game_type_t::TWOxONE;

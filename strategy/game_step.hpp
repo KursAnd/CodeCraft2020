@@ -93,7 +93,7 @@ public:
   const std::vector<Entity> &get_vector (const EntityType type) const;
   std::vector<Entity> &get_enemy_vector (const EntityType type);
   const std::vector<Entity> &get_enemy_vector (const EntityType type) const;
-  game_type_t get_game_type ();
+  game_type_t get_game_type () const;
 
   bool is_busy (const int id) const;
   bool is_busy (const Entity &entity) const;
