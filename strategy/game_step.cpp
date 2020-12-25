@@ -927,6 +927,7 @@ void game_step_t::move_builders ()
           else if (   is_correct (p)
                    && map_id[p.x][p.y] != -1
                    && get_entity_by_id (map_id[p.x][p.y]).entityType == BUILDER_UNIT
+                   && !m_entity_by_id.at (map_id[p.x][p.y]).is_enemy
                    && !is_busy (map_id[p.x][p.y]))
             {
               const int id = map_id[p.x][p.y];
