@@ -1113,6 +1113,9 @@ void game_step_t::attack_step_back ()
             }
         }
 
+      if (!moveAction && !atackAction)
+        continue;
+
       result->entityActions[entity.id] = EntityAction (moveAction, nullptr, atackAction, nullptr);
       make_busy (entity.id);
     }
@@ -1400,6 +1403,34 @@ void game_step_t::attack_others_out_zone ()
                 }
             }
         }
+    }
+}
+
+void game_step_t::attack_clear_place ()
+{
+  const EntityType type = RANGED_UNIT;
+  const EntityProperties &prop = playerView->entityProperties.at (type);
+  for (const Entity &entity : get_vector (type))
+    {
+      Vec2Int pos = entity.position;
+      if (   is_busy (entity)
+          || map_run[pos.x][pos.y] == 0
+          || (entity.position.x <= MIN_POSITION_RANGED_DO_STEP_BACK && entity.position.y <= MIN_POSITION_RANGED_DO_STEP_BACK)) // TO-DO: exclude it
+        continue;
+
+      std::shared_ptr<AttackAction> atackAction  = nullptr;
+
+      for (const Vec2Int p : get_poses_around (entity.position))
+        {
+          if (is_correct (p) && map_run[p.x][p.y] > map_run[entity.position.x][entity.position.y] && is_place_contain (p.x, p.y, RESOURCE))
+            {
+              atackAction  = std::shared_ptr<AttackAction> (new AttackAction (std::shared_ptr<int> (new int (map_id[p.x][p.y])), nullptr));
+              break;
+            }
+        }
+
+      result->entityActions[entity.id] = EntityAction (nullptr, nullptr, atackAction, nullptr);
+      make_busy (entity.id);
     }
 }
 

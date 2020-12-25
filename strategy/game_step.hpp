@@ -137,6 +137,7 @@ public:
   void attack_out_zone ();
   void attack_others_in_zone ();
   void attack_others_out_zone ();
+  void attack_clear_place ();
   void attack_try_heal ();
   void builder_step_back ();
   void move_army ();
